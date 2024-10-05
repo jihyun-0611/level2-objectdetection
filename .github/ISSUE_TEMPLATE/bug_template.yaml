@@ -17,7 +17,6 @@ body:
     validations:
       required: true
   - type: textarea
-  attributes:
-    label: 📝 기타
-    description: 기타 도움이 될 만한 정보를 작성해 주세요.
-    
+    attributes:
+      label: 📝 기타
+      description: 기타 도움이 될 만한 정보를 작성해 주세요.
