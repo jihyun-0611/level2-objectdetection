@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import json
 import os
 from PIL import Image, ImageDraw, ImageFont
+import numpy as np
+import albumentations as A
 
 # 카테고리별 색상 지정
 category_colors = {
@@ -54,32 +56,24 @@ def draw_bbox(image, annotations):
     
     st.image(image)
 
-    # plt는 느림
-    #   plt.figure(figsize=(10, 10))
-    #   plt.imshow(image) 
+def augmentation(image, annotations, aug_method):
+    image_np = np.array(image)
 
-    # for ann in annotations:
-    #     bbox = ann['bbox']
-    #     category_id = ann['category_id']
+    # bbox 정보 추출
+    bboxes = [ann['bbox'] for ann in annotations]
+    # 카테고리 정보 추출
+    category_ids = [ann['category_id'] for ann in annotations]
+    # bbox, 카테고리, 이미지에 대한 augmentation 수행
+    augmentation_image = aug_method(image=image_np,bboxes=bboxes, category_ids=category_ids)
 
-    #     # bbox 좌표 계산
-    #     x_min, y_min, width, height = bbox
-    #     x_max = x_min + width
-    #     y_max = y_min + height
+    aug_image = Image.fromarray(augmentation_image['image'])
 
-    #     # bbox 그리기
-    #     plt.gca().add_patch(plt.Rectangle((x_min, y_min), width, height, 
-    #                                         linewidth=2, edgecolor=category_colors[category_id][0], facecolor='none'))
+    for i, ann in enumerate(annotations):
+        ann['bbox'] = augmentation_image['bboxes'][i]
 
-    #     # 텍스트 배경 그리기
-    #     text = category_colors[category_id][1]
-    #     text_size = plt.text(x_min, y_min, text, fontsize=12, color='white', 
-    #                           bbox=dict(facecolor=category_colors[category_id][0], alpha=0.5))
+    return aug_image, annotations
 
-    # plt.axis('off')
-    # st.pyplot(plt)
-
-st.title("hello ai")
+st.title("데이터 시각화 및 증강")
 
 with open('/home/ksy/Documents/naver_ai_tech/LV2/dataset/train.json', 'r') as f:
     train_data = json.load(f)
@@ -94,11 +88,55 @@ image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_da
 selected_image = st.selectbox("Choose an image to display", image_files)
 
 if selected_image:
+    # 파일 경로 설정
     image_path = os.path.join('/home/ksy/Documents/naver_ai_tech/LV2/dataset', selected_image)
 
+    # 선택한 이미지에 대한 annotation 정보 추출
     select_index = image_files.index(selected_image)
     image_id = image_ids[select_index]
     annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
 
     image = Image.open(image_path)
+
+    # 사이드바에 augmentation 옵션 추가
+    st.sidebar.title("Augmentation")
+
+    # augmentation 옵션 설정
+    hflip = st.sidebar.checkbox("Horizontal Flip")
+    vflip = st.sidebar.checkbox("Vertical Flip")
+    random_crop = st.sidebar.checkbox("Random Crop")
+    rotate = st.sidebar.slider("Rotate", -180, 180, 0)
+    brightness = st.sidebar.slider("Brightness", 0.0, 2.0, 1.0)
+    gauss_noise = st.sidebar.slider("Gauss Noise", 0, 50, 0)
+
+    st.sidebar.header("HueSaturationValue")
+    hue = st.sidebar.slider("Hue Shift", -20, 20, 0)
+    saturation = st.sidebar.slider("Saturation Shift", -30, 30, 0)
+    value = st.sidebar.slider("Value Shift", -30, 30, 0)
+
+    # augmentation 옵션에 따라 이미지 변환
+    augmentations = []
+    if hflip:
+        augmentations.append(A.HorizontalFlip(p=1.0))
+    if vflip:
+        augmentations.append(A.VerticalFlip(p=1.0))
+    if rotate:
+        augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0))
+    if brightness:
+        augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
+    if random_crop:
+        augmentations.append(A.RandomCrop(width=200, height=200, p=1.0))
+    if hue or saturation or value:
+        augmentations.append(A.HueSaturationValue(hue_shift_limit=hue, sat_shift_limit=saturation, val_shift_limit=value, p=1.0))
+    if gauss_noise:
+        augmentations.append(A.GaussNoise(var_limit=(gauss_noise, gauss_noise), p=1.0))
+    
+
+    if augmentations:
+        # augmentation 메소드 생성. 
+        # bbox 정보를 coco format(x_min, y_min, width, height)으로 설정 
+        #  -> 제공된 쓰레기 데이터의 bbox가 coco format을 따름
+        aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
+        image, annotations = augmentation(image, annotations, aug_method)
+
     draw_bbox(image, annotations)
