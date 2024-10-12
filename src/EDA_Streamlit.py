@@ -112,20 +112,20 @@ with open('/home/ksy/Documents/naver_ai_tech/LV2/dataset/test.json', 'r') as f:
 # json 파일에서 이미지 파일명, id를 추출
 image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
 
-if 'image_select' not in st.session_state:
-    st.session_state.image_select = 0
+if 'image_index' not in st.session_state:
+    st.session_state.image_index = 0
 
 # 이미지 파일명을 Select Box로 선택할 수 있도록 구성
-selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_select)
-if image_files.index(selected_image) != st.session_state.image_select:
-    st.session_state.image_select = image_files.index(selected_image)
+selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_index)
+if image_files.index(selected_image) != st.session_state.image_index:
+    st.session_state.image_index = image_files.index(selected_image)
     st.rerun()
 
 # 파일 경로 설정
 image_path = os.path.join('/home/ksy/Documents/naver_ai_tech/LV2/dataset', selected_image)
 
 # 선택한 이미지에 대한 annotation 정보 추출
-image_id = image_ids[st.session_state.image_select]
+image_id = image_ids[st.session_state.image_index]
 annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
 
 image = Image.open(image_path)
@@ -178,12 +178,12 @@ prev_button, next_button = st.columns([1, 1])
 
 # 이전 이미지 버튼
 if prev_button.button("Previous Image"):
-    if st.session_state.image_select > 0:
-        st.session_state.image_select -= 1
+    if st.session_state.image_index > 0:
+        st.session_state.image_index -= 1
         st.rerun()
 
 # 다음 이미지 버튼
 if next_button.button("Next Image"):
-    if st.session_state.image_select < len(image_files) - 1:
-        st.session_state.image_select += 1
+    if st.session_state.image_index < len(image_files) - 1:
+        st.session_state.image_index += 1
         st.rerun() # 현재 블록을 재실행
