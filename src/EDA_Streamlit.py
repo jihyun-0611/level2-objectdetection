@@ -117,7 +117,9 @@ if 'image_select' not in st.session_state:
 
 # 이미지 파일명을 Select Box로 선택할 수 있도록 구성
 selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_select)
-st.session_state.image_select = image_files.index(selected_image)
+if image_files.index(selected_image) != st.session_state.image_select:
+    st.session_state.image_select = image_files.index(selected_image)
+    st.rerun()
 
 # 파일 경로 설정
 image_path = os.path.join('/home/ksy/Documents/naver_ai_tech/LV2/dataset', selected_image)
@@ -178,8 +180,10 @@ prev_button, next_button = st.columns([1, 1])
 if prev_button.button("Previous Image"):
     if st.session_state.image_select > 0:
         st.session_state.image_select -= 1
+        st.rerun()
 
 # 다음 이미지 버튼
 if next_button.button("Next Image"):
     if st.session_state.image_select < len(image_files) - 1:
         st.session_state.image_select += 1
+        st.rerun() # 현재 블록을 재실행
