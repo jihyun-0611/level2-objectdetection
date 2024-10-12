@@ -5,6 +5,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import albumentations as A
+import pandas as pd
 
 # 카테고리별 색상 지정
 category_colors = {
@@ -24,10 +25,17 @@ category_colors = {
 def draw_bbox(image, annotations):
     # 이미지에 대한 draw 객체 생성
     draw = ImageDraw.Draw(image)
-    
+
+    # annotation 별 카테고리 카운트를 위한 딕셔너리
+    annotation_table = {category_colors[i][1] : 0 for i in range(10)}
+
     for ann in annotations:
         bbox = ann['bbox']
         category_id = ann['category_id']
+
+        # annotation 별 카테고리 카운트 증가
+        category_name = category_colors[category_id][1]
+        annotation_table[category_name] += 1
 
         # bbox 좌표 계산
         x_min, y_min, width, height = bbox
@@ -54,7 +62,27 @@ def draw_bbox(image, annotations):
         # 텍스트 그리기 (흰색으로)
         draw.text((x_min, y_min - 35), text, fill="white", font=font)
     
+    # 0인 카테고리는 제외하고 DataFrame으로 변환
+    df = pd.DataFrame({
+        'category': [k for k, v in annotation_table.items() if v > 0],
+        'count': [v for v in annotation_table.values() if v > 0]
+    })
+
+    # 카테고리별 count 내림차순 정렬
+    df = df.sort_values(by='count', ascending=False)
+
+    # 파이 차트 색상을 카테고리 이름에 맞춰 설정
+    colors = [category_colors[key][0] for category in df['category'] for key, value in category_colors.items() if value[1] == category]
+
+    fig, ax = plt.subplots()
+    ax.pie(df['count'], labels=df['category'], autopct='%1.1f%%', startangle=90, colors=colors)
     st.image(image)
+
+    st.header("Annotation Table")
+    category_count, category_pie = st.columns([1, 2])
+
+    category_count.dataframe(df)
+    category_pie.pyplot(fig)
 
 def augmentation(image, annotations, aug_method):
     image_np = np.array(image)
