@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import albumentations as A
 import pandas as pd
+import cv2
 
 # 카테고리별 색상 지정
 category_colors = {
@@ -157,7 +158,7 @@ if hflip:
 if vflip:
     augmentations.append(A.VerticalFlip(p=1.0))
 if rotate:
-    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0,))
+    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0, border_mode=cv2.BORDER_CONSTANT))
 if brightness:
     augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
 if random_crop:
@@ -190,4 +191,4 @@ if prev_button.button("Previous Image"):
 if next_button.button("Next Image"):
     if st.session_state.image_index < len(image_files) - 1:
         st.session_state.image_index += 1
-        st.rerun() # 현재 블록을 재실행
+        st.rerun()
