@@ -93,13 +93,17 @@ def augmentation(image, annotations, aug_method):
     category_ids = [ann['category_id'] for ann in annotations]
     # bbox, 카테고리, 이미지에 대한 augmentation 수행
     augmentation_image = aug_method(image=image_np,bboxes=bboxes, category_ids=category_ids)
-
+    
     aug_image = Image.fromarray(augmentation_image['image'])
 
-    for i, ann in enumerate(annotations):
-        ann['bbox'] = augmentation_image['bboxes'][i]
+    # augmentation_image의 딕셔너리 key 값 (bboxes, category_ids)이 train.json(bbox, category_id)과 다르므로 일치시킴
+    # augmentation을 할 때와 안할 때, bbox를 똑같이 출력해줘야 하니까 같은 key값이 필요함.
+    new_annotations = [
+        {'bbox': bbox, 'category_id': category_id}
+        for bbox, category_id in zip(augmentation_image['bboxes'], augmentation_image['category_ids'])
+    ]
 
-    return aug_image, annotations
+    return aug_image, new_annotations
 
 st.title("데이터 시각화 및 증강")
 
@@ -153,7 +157,7 @@ if hflip:
 if vflip:
     augmentations.append(A.VerticalFlip(p=1.0))
 if rotate:
-    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0))
+    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0,))
 if brightness:
     augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
 if random_crop:
