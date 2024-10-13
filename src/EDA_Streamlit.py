@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import albumentations as A
 import pandas as pd
+import cv2
 
 # 카테고리별 색상 지정
 category_colors = {
@@ -93,13 +94,17 @@ def augmentation(image, annotations, aug_method):
     category_ids = [ann['category_id'] for ann in annotations]
     # bbox, 카테고리, 이미지에 대한 augmentation 수행
     augmentation_image = aug_method(image=image_np,bboxes=bboxes, category_ids=category_ids)
-
+    
     aug_image = Image.fromarray(augmentation_image['image'])
 
-    for i, ann in enumerate(annotations):
-        ann['bbox'] = augmentation_image['bboxes'][i]
+    # augmentation_image의 딕셔너리 key 값 (bboxes, category_ids)이 train.json(bbox, category_id)과 다르므로 일치시킴
+    # augmentation을 할 때와 안할 때, bbox를 똑같이 출력해줘야 하니까 같은 key값이 필요함.
+    new_annotations = [
+        {'bbox': bbox, 'category_id': category_id}
+        for bbox, category_id in zip(augmentation_image['bboxes'], augmentation_image['category_ids'])
+    ]
 
-    return aug_image, annotations
+    return aug_image, new_annotations
 
 st.title("데이터 시각화 및 증강")
 
@@ -112,18 +117,20 @@ with open('/home/ksy/Documents/naver_ai_tech/LV2/dataset/test.json', 'r') as f:
 # json 파일에서 이미지 파일명, id를 추출
 image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
 
-if 'image_select' not in st.session_state:
-    st.session_state.image_select = 0
+if 'image_index' not in st.session_state:
+    st.session_state.image_index = 0
 
 # 이미지 파일명을 Select Box로 선택할 수 있도록 구성
-selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_select)
-st.session_state.image_select = image_files.index(selected_image)
+selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_index)
+if image_files.index(selected_image) != st.session_state.image_index:
+    st.session_state.image_index = image_files.index(selected_image)
+    st.rerun()
 
 # 파일 경로 설정
 image_path = os.path.join('/home/ksy/Documents/naver_ai_tech/LV2/dataset', selected_image)
 
 # 선택한 이미지에 대한 annotation 정보 추출
-image_id = image_ids[st.session_state.image_select]
+image_id = image_ids[st.session_state.image_index]
 annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
 
 image = Image.open(image_path)
@@ -151,7 +158,7 @@ if hflip:
 if vflip:
     augmentations.append(A.VerticalFlip(p=1.0))
 if rotate:
-    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0))
+    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0, border_mode=cv2.BORDER_CONSTANT))
 if brightness:
     augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
 if random_crop:
@@ -176,10 +183,12 @@ prev_button, next_button = st.columns([1, 1])
 
 # 이전 이미지 버튼
 if prev_button.button("Previous Image"):
-    if st.session_state.image_select > 0:
-        st.session_state.image_select -= 1
+    if st.session_state.image_index > 0:
+        st.session_state.image_index -= 1
+        st.rerun()
 
 # 다음 이미지 버튼
 if next_button.button("Next Image"):
-    if st.session_state.image_select < len(image_files) - 1:
-        st.session_state.image_select += 1
+    if st.session_state.image_index < len(image_files) - 1:
+        st.session_state.image_index += 1
+        st.rerun()
