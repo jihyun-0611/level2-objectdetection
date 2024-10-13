@@ -1,3 +1,4 @@
+import argparse
 import streamlit as st
 import matplotlib.pyplot as plt
 import json
@@ -7,6 +8,13 @@ import numpy as np
 import albumentations as A
 import pandas as pd
 import cv2
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='EDA with Streamlit')
+    parser.add_argument('--dataset_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/dataset')
+    parser.add_argument('--font_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/arial.ttf')
+    args = parser.parse_args()
+    return args
 
 # 카테고리별 색상 지정
 category_colors = {
@@ -21,6 +29,15 @@ category_colors = {
     8: ["brown", "Battery"],       
     9: ["pink", "Clothing"]         
 }
+
+def load_json(dataset_path):
+    with open(os.path.join(dataset_path, 'train.json'), 'r') as f:
+        train_data = json.load(f)
+    
+    with open(os.path.join(dataset_path, 'test.json'), 'r') as f:
+        test_data = json.load(f)
+
+    return train_data, test_data
 
 # bbox 출력
 def draw_bbox(image, annotations):
@@ -45,24 +62,30 @@ def draw_bbox(image, annotations):
         
         # bbox 그리기
         draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
+        draw_bbox_text(draw, (x_min, y_min), category_name, category_colors[category_id][0])
 
+    return image, annotation_table
+    
+# bbox 텍스트 출력
+def draw_bbox_text(draw, position ,category_name, color):
         # 폰트 설정
         font_size = 30
         font = ImageFont.truetype("/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/arial.ttf", font_size) 
 
         # 텍스트 배경 사각형 좌표 계산
-        text = category_colors[category_id][1]
-        text_bbox = draw.textbbox((x_min, y_min), text, font=font)  # 텍스트 경계 상자 계산
+        text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
         text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
 
-        background_bbox = [x_min, y_min - 35, x_min + text_width, y_min]
+        background_bbox = [position[0], position[1] - 35, position[0] + text_width, position[1] - 5]
 
         # 텍스트 배경 그리기 (객체 색상으로 배경 채우기)
-        draw.rectangle(background_bbox, fill=category_colors[category_id][0])
+        draw.rectangle(background_bbox, fill=color)
 
         # 텍스트 그리기 (흰색으로)
-        draw.text((x_min, y_min - 35), text, fill="white", font=font)
-    
+        draw.text((position[0], position[1] - 35), category_name, fill="white", font=font)
+
+# annotation table 생성
+def annotation_table_viz(annotation_table):
     # 0인 카테고리는 제외하고 DataFrame으로 변환
     df = pd.DataFrame({
         'category': [k for k, v in annotation_table.items() if v > 0],
@@ -72,20 +95,40 @@ def draw_bbox(image, annotations):
     # 카테고리별 count 내림차순 정렬
     df = df.sort_values(by='count', ascending=False)
 
+    return df
+
+# 파이 차트 생성
+def pie_chart(df):
     # 파이 차트 색상을 카테고리 이름에 맞춰 설정
     colors = [category_colors[key][0] for category in df['category'] for key, value in category_colors.items() if value[1] == category]
 
+    # 파이 차트 생성
     fig, ax = plt.subplots()
     ax.pie(df['count'], labels=df['category'], autopct='%1.1f%%', startangle=90, colors=colors)
-    st.image(image)
 
-    st.header("Annotation Table")
-    category_count, category_pie = st.columns([1, 2])
+    return fig
 
-    category_count.dataframe(df)
-    category_pie.pyplot(fig)
+# augmentation 옵션 구성
+def augmentation_compose(hflip, vflip, random_crop, rotate, brightness, hue, saturation, value, gauss_noise):
+    augmentations = []
+    if hflip:
+        augmentations.append(A.HorizontalFlip(p=1.0))
+    if vflip:
+        augmentations.append(A.VerticalFlip(p=1.0))
+    if rotate:
+        augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0, border_mode=cv2.BORDER_CONSTANT))
+    if brightness:
+        augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
+    if random_crop:
+        augmentations.append(A.RandomCrop(width=200, height=200, p=1.0))
+    if hue or saturation or value:
+        augmentations.append(A.HueSaturationValue(hue_shift_limit=hue, sat_shift_limit=saturation, val_shift_limit=value, p=1.0))
+    if gauss_noise:
+        augmentations.append(A.GaussNoise(var_limit=(gauss_noise, gauss_noise), p=1.0))
 
-def augmentation(image, annotations, aug_method):
+    return augmentations
+
+def apply_augmentation(image, annotations, aug_method):
     image_np = np.array(image)
 
     # bbox 정보 추출
@@ -106,89 +149,91 @@ def augmentation(image, annotations, aug_method):
 
     return aug_image, new_annotations
 
-st.title("데이터 시각화 및 증강")
+def main(opt):
+    # json 파일 로드
+    dataset_path = opt.dataset_path
+    train_data, test_data = load_json(dataset_path)
 
-with open('/home/ksy/Documents/naver_ai_tech/LV2/dataset/train.json', 'r') as f:
-    train_data = json.load(f)
-
-with open('/home/ksy/Documents/naver_ai_tech/LV2/dataset/test.json', 'r') as f:
-    test_data = json.load(f)
-
-# json 파일에서 이미지 파일명, id를 추출
-image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
-
-if 'image_index' not in st.session_state:
-    st.session_state.image_index = 0
-
-# 이미지 파일명을 Select Box로 선택할 수 있도록 구성
-selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_index)
-if image_files.index(selected_image) != st.session_state.image_index:
-    st.session_state.image_index = image_files.index(selected_image)
-    st.rerun()
-
-# 파일 경로 설정
-image_path = os.path.join('/home/ksy/Documents/naver_ai_tech/LV2/dataset', selected_image)
-
-# 선택한 이미지에 대한 annotation 정보 추출
-image_id = image_ids[st.session_state.image_index]
-annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
-
-image = Image.open(image_path)
-
-# 사이드바에 augmentation 옵션 추가
-st.sidebar.title("Augmentation")
-
-# augmentation 옵션 설정
-hflip = st.sidebar.checkbox("Horizontal Flip")
-vflip = st.sidebar.checkbox("Vertical Flip")
-random_crop = st.sidebar.checkbox("Random Crop")
-rotate = st.sidebar.slider("Rotate", -180, 180, 0)
-brightness = st.sidebar.slider("Brightness", 0.0, 2.0, 1.0)
-gauss_noise = st.sidebar.slider("Gauss Noise", 0, 50, 0)
-
-st.sidebar.header("HueSaturationValue")
-hue = st.sidebar.slider("Hue Shift", -20, 20, 0)
-saturation = st.sidebar.slider("Saturation Shift", -30, 30, 0)
-value = st.sidebar.slider("Value Shift", -30, 30, 0)
-
-# augmentation 옵션에 따라 이미지 변환
-augmentations = []
-if hflip:
-    augmentations.append(A.HorizontalFlip(p=1.0))
-if vflip:
-    augmentations.append(A.VerticalFlip(p=1.0))
-if rotate:
-    augmentations.append(A.Rotate(limit=(rotate, rotate), p=1.0, border_mode=cv2.BORDER_CONSTANT))
-if brightness:
-    augmentations.append(A.RandomBrightnessContrast(brightness_limit=(brightness - 1, brightness - 1), p=1.0))
-if random_crop:
-    augmentations.append(A.RandomCrop(width=200, height=200, p=1.0))
-if hue or saturation or value:
-    augmentations.append(A.HueSaturationValue(hue_shift_limit=hue, sat_shift_limit=saturation, val_shift_limit=value, p=1.0))
-if gauss_noise:
-    augmentations.append(A.GaussNoise(var_limit=(gauss_noise, gauss_noise), p=1.0))
+    # json 파일에서 이미지 파일명, id를 추출
+    image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
 
 
-if augmentations:
-    # augmentation 메소드 생성. 
-    # bbox 정보를 coco format(x_min, y_min, width, height)으로 설정 
-    #  -> 제공된 쓰레기 데이터의 bbox가 coco format을 따름
-    aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
-    image, annotations = augmentation(image, annotations, aug_method)
+    if 'image_index' not in st.session_state:
+        st.session_state.image_index = 0
 
-draw_bbox(image, annotations)
+    st.title("데이터 시각화 및 증강")
 
-# 버튼으로 이미지 이동
-prev_button, next_button = st.columns([1, 1])
+    # 버튼으로 이미지 이동
+    prev_button, next_button = st.columns([1, 1])
 
-# 이전 이미지 버튼
-if prev_button.button("Previous Image"):
-    if st.session_state.image_index > 0:
-        st.session_state.image_index -= 1
+    # 이미지 파일명을 Select Box로 선택할 수 있도록 구성
+    selected_image = st.selectbox("Choose an image to display", image_files, index=st.session_state.image_index)
+    if image_files.index(selected_image) != st.session_state.image_index:
+        st.session_state.image_index = image_files.index(selected_image)
         st.rerun()
 
-# 다음 이미지 버튼
-if next_button.button("Next Image"):
-    if st.session_state.image_index < len(image_files) - 1:
-        st.session_state.image_index += 1
-        st.rerun()
+    # 파일 경로 설정
+    image_path = os.path.join(dataset_path, selected_image)
+
+    # 선택한 이미지에 대한 annotation 정보 추출
+    image_id = image_ids[st.session_state.image_index]
+    annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
+
+    image = Image.open(image_path)
+
+    # 사이드바에 augmentation 옵션 추가
+    st.sidebar.title("Augmentation")
+
+    # augmentation 옵션 설정
+    hflip = st.sidebar.checkbox("Horizontal Flip")
+    vflip = st.sidebar.checkbox("Vertical Flip")
+    random_crop = st.sidebar.checkbox("Random Crop")
+    rotate = st.sidebar.slider("Rotate", -180, 180, 0)
+    brightness = st.sidebar.slider("Brightness", 0.0, 2.0, 1.0)
+    gauss_noise = st.sidebar.slider("Gauss Noise", 0, 50, 0)
+
+    st.sidebar.header("HueSaturationValue")
+    hue = st.sidebar.slider("Hue Shift", -20, 20, 0)
+    saturation = st.sidebar.slider("Saturation Shift", -30, 30, 0)
+    value = st.sidebar.slider("Value Shift", -30, 30, 0)
+
+    augmentations = augmentation_compose(hflip, vflip, random_crop, rotate, brightness, hue, saturation, value, gauss_noise)
+
+    if augmentations:
+        # augmentation 메소드 생성. 
+        # bbox 정보를 coco format(x_min, y_min, width, height)으로 설정 
+        #  -> 제공된 쓰레기 데이터의 bbox가 coco format을 따름
+        aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
+        image, annotations = apply_augmentation(image, annotations, aug_method)
+
+    image, annotation_table = draw_bbox(image, annotations)
+
+    # 이미지 출력
+    st.image(image)
+
+    # annotation table 및 파이 차트 출력 setting
+    st.header("Annotation Table")
+    category_count, category_pie = st.columns([1, 2])
+
+    # annotation table 출력
+    df = annotation_table_viz(annotation_table)
+    category_count.dataframe(df)
+
+    # 파이 차트 출력
+    category_pie.pyplot(pie_chart(df))
+
+    # 이전 이미지 버튼
+    if prev_button.button("Previous Image"):
+        if st.session_state.image_index > 0:
+            st.session_state.image_index -= 1
+            st.rerun()
+
+    # 다음 이미지 버튼
+    if next_button.button("Next Image"):
+        if st.session_state.image_index < len(image_files) - 1:
+            st.session_state.image_index += 1
+            st.rerun()
+
+if __name__ == '__main__':
+    opt = parse_args()
+    main(opt)
