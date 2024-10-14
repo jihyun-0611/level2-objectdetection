@@ -191,7 +191,11 @@ def count_by_category(annotations, sort=False):
     fig, ax = plt.subplots()
     if sort:
         category_count = dict(sorted(category_count.items(), key=lambda x: x[1], reverse=True))
-    ax.bar(category_count.keys(), category_count.values())
+    graphs = ax.bar(category_count.keys(), category_count.values())
+
+    for graph in graphs:
+        height = graph.get_height()
+        ax.annotate(f'{height}', xy=(graph.get_x() + graph.get_width() / 2, height), ha='center', va='bottom')
     ax.set_xlabel("Category")
     ax.set_ylabel("Count")
 
@@ -199,22 +203,13 @@ def count_by_category(annotations, sort=False):
 
     return fig
 
-# bbox 넓이 계산
-def calculate_bbox_area(annotation):
+# bbox 넓이에 따라 선택
+def select_bbox_area(all_annotations, min_area, max_area):
     bbox_area = {i : [] for i in range(10)}
 
-    for ann in annotation:
-        bbox = ann['bbox']
-        category_id = ann['category_id']
-        area = round(bbox[2] * bbox[3], 1)
-        bbox_area[category_id].append(area)
-        
-    return bbox_area
-
-# bbox 넓이에 따라 선택
-def select_bbox_area(bbox_area, min_area, max_area):
-    for key, value in bbox_area.items():
-        bbox_area[key] = [area for area in value if min_area <= area <= max_area]
+    for all_annotation in all_annotations:
+        if min_area <= all_annotation["area"] <= max_area:
+            bbox_area[all_annotation["category_id"]].append(all_annotation["area"])
 
     return bbox_area
 
@@ -234,8 +229,10 @@ def bbox_area_viz(bbox_area, selected_category):
     ax.set_title(f"BBox Area Distribution for {selected_category}")
     ax.set_xlabel("Area")
     ax.set_ylabel("Count")
+
+    count_bbox_area = len(bbox_areas)
     
-    return fig
+    return fig, count_bbox_area
 
 def main(opt):
     # st.set_page_config(layout="wide")
@@ -361,8 +358,6 @@ def main(opt):
         heatmap_viz.pyplot(heatmap)
 
         st.subheader("카테고리 별 bbox 크기 분포")
-        bbox_area = calculate_bbox_area(all_annotations)
-        
         col_category_bbox_area, col_bbox_area = st.columns([1, 4])
 
         selected_category_for_bbox_area = col_category_bbox_area.radio(
@@ -371,10 +366,15 @@ def main(opt):
             key="bbox_area_category_selection"
         )
 
-        bbox_area_slider = st.slider("확인할 bbox의 넓이를 선택하세요", 0, 1024*1024, (250000, 680000))
-        selected_bbox_area = select_bbox_area(bbox_area, bbox_area_slider[0], bbox_area_slider[1])
-        bbox_area_histogram= bbox_area_viz(selected_bbox_area, selected_category_for_bbox_area)
+        min_bbox_area, max_bbox_area = st.columns(2)
+
+        min_bbox_area = min_bbox_area.number_input("최소 bbox 넓이", min_value=0, max_value=1024*1024, value=250000)
+        max_bbox_area = max_bbox_area.number_input("최대 bbox 넓이", min_value=0, max_value=1024*1024, value=680000)
+        bbox_area_slider = st.slider("확인할 bbox의 넓이를 선택하세요", 0, 1024*1024, (min_bbox_area, max_bbox_area))
+        selected_bbox_area = select_bbox_area(all_annotations, bbox_area_slider[0], bbox_area_slider[1])
+        bbox_area_histogram, count_bbox_area= bbox_area_viz(selected_bbox_area, selected_category_for_bbox_area)
         col_bbox_area.pyplot(bbox_area_histogram)
+        st.write (f"선택된 bbox 영역의 수: {count_bbox_area}")
 
 if __name__ == '__main__':
     opt = parse_args()
