@@ -78,7 +78,7 @@ def draw_bbox(image, annotations):
 def draw_bbox_text(draw, position ,category_name, color):
         # 폰트 설정
         font_size = 30
-        font = ImageFont.truetype("/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/arial.ttf", font_size) 
+        font = ImageFont.truetype(opt.font_path, font_size) 
 
         # 텍스트 배경 사각형 좌표 계산
         text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
