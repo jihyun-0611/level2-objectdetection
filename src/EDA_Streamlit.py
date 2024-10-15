@@ -410,19 +410,21 @@ def main(opt):
 
         # 선택한 이미지에 대한 annotation 정보 추출
         image_id = val_image_ids[st.session_state.inference_image_index]
-        train_annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
+        val_annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
         inference_annotations = [ann for ann in inference_data if ann['image_id'] == image_id]
 
         image = Image.open(image_path)
 
-        train_image, annotation_table = draw_bbox(opt, image, train_annotations, train = True)
+        train_image, annotation_table = draw_bbox(opt, image, val_annotations, train = True)
         
         image_copy = image.copy()
         inference_image, _ = draw_bbox(opt, image_copy, inference_annotations, train = False)
 
         train_image_col, inference_image_col = st.columns([1, 1])
         train_image_col.image(train_image)
+        train_image_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
         inference_image_col.image(inference_image)
+        inference_image_col.write(f"추론한 bbox의 갯수는 {len(inference_annotations)}개 입니다.")
 
 if __name__ == '__main__':
     opt = parse_args()
