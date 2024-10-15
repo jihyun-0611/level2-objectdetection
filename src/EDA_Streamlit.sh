@@ -3,4 +3,4 @@ font_path='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/sr
 inference_path='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/inference_json/val_split_rand411_pred_latest.json' # 본인의 inference json 파일 경로를 입력하세요.
 validation_path='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/validation_json/val_split_random411.json' # 본인의 validation json 파일 경로를 입력하세요.
 
-streamlit run EDA_Streamlit.py -- --dataset_path "$dataset_path" --font_path "$font_path"
+streamlit run EDA_Streamlit.py -- --dataset_path "$dataset_path" --font_path "$font_path" --inference_path "$inference_path" --validation_path "$validation_path"
