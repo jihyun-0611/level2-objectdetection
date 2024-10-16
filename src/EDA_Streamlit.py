@@ -475,7 +475,7 @@ def main(opt):
 
         train_image, _ = draw_train_bbox(opt, image, val_annotations)
     
-        st.subheader("IoU Threshold로 보는 EDA :rocket:")
+        st.subheader("IoU Threshold로 보는 bbox :rocket:")
         iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
 
         st.write("Threshold가 0일 땐 모든 예측된 박스가 표시되며 그 외에는 validation 카테고리와 관련된 박스만 표시됩니다.")
@@ -489,7 +489,7 @@ def main(opt):
         inference_image_iou_col.write(f"추론한 bbox의 갯수는 {iou_count}개 입니다.")
 
         ## confidence score
-        st.subheader("confidence score로 보는 EDA :fire:")
+        st.subheader("confidence score로 보는 bbox :fire:")
         score_threshold = st.slider("Confidence Score Threshold", 0.0, 1.0, 0.5)
         st.write("Threshold 이상의 confidence score를 가진 박스만 표시됩니다.")
         inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, score_image, val_annotations, inference_annotations, score_threshold, iou_flag=False)
