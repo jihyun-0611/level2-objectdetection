@@ -14,6 +14,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='EDA with Streamlit')
     parser.add_argument('--dataset_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/dataset')
     parser.add_argument('--font_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/arial.ttf')
+    parser.add_argument('--inference_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/inference_json/val_split_rand411_pred_latest.json')
+    parser.add_argument('--validation_path', type=str, default='/home/ksy/Documents/naver_ai_tech/LV2/level2-objectdetection-cv-23/src/validation_json/val_split_random411.json')
     args = parser.parse_args()
     return args
 
@@ -31,14 +33,17 @@ category_colors = {
     9: ["pink", "Clothing"]         
 }
 
-def load_json(dataset_path):
+def load_train_json(dataset_path):
     with open(os.path.join(dataset_path, 'train.json'), 'r') as f:
-        train_data = json.load(f)
-    
-    with open(os.path.join(dataset_path, 'test.json'), 'r') as f:
-        test_data = json.load(f)
+        data = json.load(f)
 
-    return train_data, test_data
+    return data
+
+def load_json(dataset_path):
+    with open(dataset_path, 'r') as f:
+        data = json.load(f)
+
+    return data
 
 # bbox 좌표 계산
 def calculate_bbox(bbox):
@@ -49,8 +54,19 @@ def calculate_bbox(bbox):
 
     return x_min, y_min, x_max, y_max
 
+def draw_bbox_comm(opt, draw, bbox, category_id):
+    category_name = category_colors[category_id][1]
+
+    # bbox 좌표 계산
+    x_min, y_min, x_max, y_max = calculate_bbox(bbox)
+
+    # bbox 그리기
+    draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
+    draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[category_id][0])
+    return category_name
+
 # bbox 출력
-def draw_bbox(opt ,image, annotations):
+def draw_train_bbox(opt ,image, annotations):
     # 이미지에 대한 draw 객체 생성
     draw = ImageDraw.Draw(image)
 
@@ -61,36 +77,29 @@ def draw_bbox(opt ,image, annotations):
         bbox = ann['bbox']
         category_id = ann['category_id']
 
-        # annotation 별 카테고리 카운트 증가
-        category_name = category_colors[category_id][1]
+        category_name = draw_bbox_comm(opt, draw, bbox, category_id)
+
         annotation_table[category_name] += 1
-
-        # bbox 좌표 계산
-        x_min, y_min, x_max, y_max = calculate_bbox(bbox)
-        
-        # bbox 그리기
-        draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
-        draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[category_id][0])
-
     return image, annotation_table
     
 # bbox 텍스트 출력
 def draw_bbox_text(opt, draw, position ,category_name, color):
-        # 폰트 설정
-        font_size = 30
-        font = ImageFont.truetype(opt.font_path, font_size) 
+    # 폰트 설정
+    font_size = 30
+    font = ImageFont.truetype(opt.font_path, font_size) 
 
-        # 텍스트 배경 사각형 좌표 계산
-        text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
-        text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
+    # 텍스트 배경 사각형 좌표 계산
+    text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
+    text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
 
-        background_bbox = [position[0], position[1] - 35, position[0] + text_width, position[1] - 5]
+    background_bbox = [position[0], position[1] - 35, position[0] + text_width, position[1] - 5]
 
-        # 텍스트 배경 그리기 (객체 색상으로 배경 채우기)
-        draw.rectangle(background_bbox, fill=color)
+    # 텍스트 배경 그리기 (객체 색상으로 배경 채우기)
+    draw.rectangle(background_bbox, fill=color)
 
-        # 텍스트 그리기 (흰색으로)
-        draw.text((position[0], position[1] - 35), category_name, fill="white", font=font)
+    # 텍스트 그리기 (흰색으로)
+    draw.text((position[0], position[1] - 35), category_name, fill="white", font=font)
+    return draw
 
 # annotation table 생성
 def annotation_table_viz(annotation_table):
@@ -234,19 +243,80 @@ def bbox_area_viz(bbox_area, selected_category):
     
     return fig, count_bbox_area
 
+def calculate_iou(val_bbox, inference_bbox):
+    val_x_min, val_y_min, val_x_max, val_y_max = calculate_bbox(val_bbox)
+    inf_x_min, inf_y_min, inf_x_max, inf_y_max = calculate_bbox(inference_bbox)
+
+    # intersection 영역 계산
+    x = max(0, min(val_x_max, inf_x_max) - max(val_x_min, inf_x_min))
+    y = max(0, min(val_y_max, inf_y_max) - max(val_y_min, inf_y_min))
+    intersection = x * y
+
+    # union 영역 계산
+    val_area = (val_x_max - val_x_min) * (val_y_max - val_y_min)
+    inf_area = (inf_x_max - inf_x_min) * (inf_y_max - inf_y_min)
+
+    # iou 계산
+    iou = intersection / (val_area + inf_area - intersection)
+
+    return iou
+
+def draw_bbox_by_threshold(opt, image, val_annotations, inference_annotations, threshold, iou_flag):
+    draw = ImageDraw.Draw(image)
+    count = 0
+
+    for inf_ann in inference_annotations:
+        inf_bbox = inf_ann['bbox']
+        inf_category_id = inf_ann['category_id']
+        inf_score = inf_ann['score']
+
+        iou_max = 0
+
+        if iou_flag:
+            for val_ann in val_annotations:
+                val_category_id = val_ann['category_id']
+                val_bbox = val_ann['bbox']
+
+                if val_category_id == inf_category_id:
+                    iou = calculate_iou(val_bbox, inf_bbox)
+                    if iou >= threshold:
+                        iou_max = iou
+            # IoU가 설정된 threshold 이상인 bbox만 그리기
+            if iou_max >= threshold:
+                count += 1
+                draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+
+        else:
+            if inf_score >= threshold:
+                count += 1
+                draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+
+    return image, count
+
+# def mAP(bboxes):
+#     for bbox in zip(bboxes):
+        
+
+
 def main(opt):
     # st.set_page_config(layout="wide")
 
-    menu = st.sidebar.radio("Menu", ["Train 데이터 EDA", "Train 데이터 시각화 확인하기"])
+    menu = st.sidebar.radio("Menu", ["inference EDA", "Train 데이터 EDA", "Train 데이터 시각화 확인하기"])
 
     # json 파일 로드
     dataset_path = opt.dataset_path
-    train_data, test_data = load_json(dataset_path)
+    train_data = load_train_json(dataset_path)
+
+    validation_path = load_json(opt.validation_path)
+
+    inference_data = load_json(opt.inference_path)
 
     all_annotations = [ann for ann in train_data['annotations']]
 
     # json 파일에서 이미지 파일명, id를 추출
     image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
+
+    val_image_files, val_image_ids = zip(*[(img['file_name'], img['id']) for img in validation_path['images']])
 
     if menu == "Train 데이터 시각화 확인하기":
         if 'image_index' not in st.session_state:
@@ -297,7 +367,7 @@ def main(opt):
             aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
             image, annotations = apply_augmentation(image, annotations, aug_method)
 
-        image, annotation_table = draw_bbox(opt, image, annotations)
+        image, annotation_table = draw_train_bbox(opt, image, annotations)
 
         # 이미지 출력
         st.image(image)
@@ -375,6 +445,63 @@ def main(opt):
         bbox_area_histogram, count_bbox_area= bbox_area_viz(selected_bbox_area, selected_category_for_bbox_area)
         col_bbox_area.pyplot(bbox_area_histogram)
         st.write (f"선택된 bbox 영역의 수: {count_bbox_area}")
+    
+    if menu == "inference EDA":
+        if 'inference_image_index' not in st.session_state:
+            st.session_state.inference_image_index = 0
+
+        st.title("inference EDA")
+
+        # 버튼으로 이미지 이동
+        prev_button, next_button = st.columns([1, 1])
+
+        # 이미지 파일명을 Select Box로 선택할 수 있도록 구성
+        selected_image = st.selectbox("이미지를 선택하세요", val_image_files, index=st.session_state.inference_image_index)
+        if val_image_files.index(selected_image) != st.session_state.inference_image_index:
+            st.session_state.inference_image_index = val_image_files.index(selected_image)
+            st.rerun()
+        
+        # 파일 경로 설정
+        image_path = os.path.join(dataset_path, selected_image)
+
+        # 선택한 이미지에 대한 annotation 정보 추출
+        image_id = val_image_ids[st.session_state.inference_image_index]
+        val_annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
+        inference_annotations = [ann for ann in inference_data if ann['image_id'] == image_id]
+
+        image = Image.open(image_path)
+        iou_image = image.copy()
+        score_image = image.copy()
+
+        train_image, _ = draw_train_bbox(opt, image, val_annotations)
+    
+        st.subheader("IoU Threshold로 보는 bbox :rocket:")
+        iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
+
+        st.write("Threshold가 0일 땐 모든 예측된 박스가 표시되며 그 외에는 validation 카테고리와 관련된 박스만 표시됩니다.")
+        inference_image, iou_count = draw_bbox_by_threshold(opt, iou_image, val_annotations ,inference_annotations, iou_threshold, iou_flag=True)
+
+        validation_image_iou_col, inference_image_iou_col = st.columns([1, 1])
+        validation_image_iou_col.image(train_image)
+        validation_image_iou_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
+        
+        inference_image_iou_col.image(inference_image)
+        inference_image_iou_col.write(f"추론한 bbox의 갯수는 {iou_count}개 입니다.")
+
+        ## confidence score
+        st.subheader("confidence score로 보는 bbox :fire:")
+        score_threshold = st.slider("Confidence Score Threshold", 0.0, 1.0, 0.5)
+        st.write("Threshold 이상의 confidence score를 가진 박스만 표시됩니다.")
+        inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, score_image, val_annotations, inference_annotations, score_threshold, iou_flag=False)
+
+
+        validation_image_score_col, inference_image_score_col = st.columns([1, 1])
+        validation_image_score_col.image(train_image)
+        validation_image_score_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
+        
+        inference_image_score_col.image(inference_image_score)
+        inference_image_score_col.write(f"추론한 bbox의 갯수는 {confidence_score_count}개 입니다.")
+
 
 if __name__ == '__main__':
     opt = parse_args()
