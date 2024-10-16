@@ -55,7 +55,7 @@ def calculate_bbox(bbox):
     return x_min, y_min, x_max, y_max
 
 # bbox 출력
-def draw_bbox(opt ,image, annotations, train):
+def draw_bbox(opt ,image, annotations):
     # 이미지에 대한 draw 객체 생성
     draw = ImageDraw.Draw(image)
 
@@ -71,10 +71,7 @@ def draw_bbox(opt ,image, annotations, train):
         annotation_table[category_name] += 1
 
         # bbox 좌표 계산
-        if train:
-            x_min, y_min, x_max, y_max = calculate_bbox(bbox)
-        else:
-            x_min, y_min, x_max, y_max = bbox
+        x_min, y_min, x_max, y_max = calculate_bbox(bbox)
 
         # bbox 그리기
         draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
@@ -242,6 +239,43 @@ def bbox_area_viz(bbox_area, selected_category):
     
     return fig, count_bbox_area
 
+def calculate_iou(val_bbox, inference_bbox):
+    val_x_min, val_y_min, val_x_max, val_y_max = calculate_bbox(val_bbox)
+    inf_x_min, inf_y_min, inf_x_max, inf_y_max = calculate_bbox(inference_bbox)
+
+    # intersection 영역 계산
+    x = max(0, min(val_x_max, inf_x_max) - max(val_x_min, inf_x_min))
+    y = max(0, min(val_y_max, inf_y_max) - max(val_y_min, inf_y_min))
+    intersection = x * y
+
+    # union 영역 계산
+    val_area = (val_x_max - val_x_min) * (val_y_max - val_y_min)
+    inf_area = (inf_x_max - inf_x_min) * (inf_y_max - inf_y_min)
+
+    # iou 계산
+    iou = intersection / (val_area + inf_area - intersection)
+
+    return iou
+
+def draw_bbox_iou(opt, image, val_annotations, inference_annotations, iou_threshold):
+    draw = ImageDraw.Draw(image)
+
+    for val_ann in val_annotations:
+        val_bbox = val_ann['bbox']
+        val_image_id = val_ann['image_id']
+
+        for inf_ann in inference_annotations:
+            if val_image_id == inf_ann['image_id']:
+                inf_category_id = inf_ann['category_id']
+                inf_bbox = inf_ann['bbox']
+                iou = calculate_iou(val_bbox, inf_bbox)
+                if iou >= iou_threshold:
+                    category_name = category_colors[inf_category_id][1]
+                    x_min, y_min, x_max, y_max = inf_bbox
+                    draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[inf_category_id][0], width=3)
+                    draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[inf_category_id][0])
+    return image
+
 def main(opt):
     # st.set_page_config(layout="wide")
 
@@ -311,7 +345,7 @@ def main(opt):
             aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
             image, annotations = apply_augmentation(image, annotations, aug_method)
 
-        image, annotation_table = draw_bbox(opt, image, annotations, train = True)
+        image, annotation_table = draw_bbox(opt, image, annotations)
 
         # 이미지 출력
         st.image(image)
@@ -414,15 +448,17 @@ def main(opt):
         inference_annotations = [ann for ann in inference_data if ann['image_id'] == image_id]
 
         image = Image.open(image_path)
-
-        train_image, annotation_table = draw_bbox(opt, image, val_annotations, train = True)
-        
         image_copy = image.copy()
-        inference_image, _ = draw_bbox(opt, image_copy, inference_annotations, train = False)
+
+        train_image, _ = draw_bbox(opt, image, val_annotations)
+    
+        iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
+        inference_image = draw_bbox_iou(opt, image_copy, val_annotations ,inference_annotations, iou_threshold)
 
         train_image_col, inference_image_col = st.columns([1, 1])
         train_image_col.image(train_image)
         train_image_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
+        
         inference_image_col.image(inference_image)
         inference_image_col.write(f"추론한 bbox의 갯수는 {len(inference_annotations)}개 입니다.")
 
