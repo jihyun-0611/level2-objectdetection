@@ -54,8 +54,19 @@ def calculate_bbox(bbox):
 
     return x_min, y_min, x_max, y_max
 
+def draw_bbox_comm(opt, draw, bbox, category_id):
+    category_name = category_colors[category_id][1]
+
+    # bbox 좌표 계산
+    x_min, y_min, x_max, y_max = calculate_bbox(bbox)
+
+    # bbox 그리기
+    draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
+    draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[category_id][0])
+    return category_name
+
 # bbox 출력
-def draw_bbox(opt ,image, annotations):
+def draw_train_bbox(opt ,image, annotations):
     # 이미지에 대한 draw 객체 생성
     draw = ImageDraw.Draw(image)
 
@@ -66,36 +77,29 @@ def draw_bbox(opt ,image, annotations):
         bbox = ann['bbox']
         category_id = ann['category_id']
 
-        # annotation 별 카테고리 카운트 증가
-        category_name = category_colors[category_id][1]
+        category_name = draw_bbox_comm(opt, draw, bbox, category_id)
+
         annotation_table[category_name] += 1
-
-        # bbox 좌표 계산
-        x_min, y_min, x_max, y_max = calculate_bbox(bbox)
-
-        # bbox 그리기
-        draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[category_id][0], width=3)
-        draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[category_id][0])
-
     return image, annotation_table
     
 # bbox 텍스트 출력
 def draw_bbox_text(opt, draw, position ,category_name, color):
-        # 폰트 설정
-        font_size = 30
-        font = ImageFont.truetype(opt.font_path, font_size) 
+    # 폰트 설정
+    font_size = 30
+    font = ImageFont.truetype(opt.font_path, font_size) 
 
-        # 텍스트 배경 사각형 좌표 계산
-        text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
-        text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
+    # 텍스트 배경 사각형 좌표 계산
+    text_bbox = draw.textbbox(position, category_name, font=font)  # 텍스트 경계 상자 계산
+    text_width, text_height = text_bbox[2] - text_bbox[0], text_bbox[3] - text_bbox[1]
 
-        background_bbox = [position[0], position[1] - 35, position[0] + text_width, position[1] - 5]
+    background_bbox = [position[0], position[1] - 35, position[0] + text_width, position[1] - 5]
 
-        # 텍스트 배경 그리기 (객체 색상으로 배경 채우기)
-        draw.rectangle(background_bbox, fill=color)
+    # 텍스트 배경 그리기 (객체 색상으로 배경 채우기)
+    draw.rectangle(background_bbox, fill=color)
 
-        # 텍스트 그리기 (흰색으로)
-        draw.text((position[0], position[1] - 35), category_name, fill="white", font=font)
+    # 텍스트 그리기 (흰색으로)
+    draw.text((position[0], position[1] - 35), category_name, fill="white", font=font)
+    return draw
 
 # annotation table 생성
 def annotation_table_viz(annotation_table):
@@ -257,24 +261,45 @@ def calculate_iou(val_bbox, inference_bbox):
 
     return iou
 
-def draw_bbox_iou(opt, image, val_annotations, inference_annotations, iou_threshold):
+def draw_bbox_by_threshold(opt, image, val_annotations, inference_annotations, threshold, iou_flag):
     draw = ImageDraw.Draw(image)
+    count = 0
+    drawn_bboxes = set()
 
     for val_ann in val_annotations:
         val_bbox = val_ann['bbox']
-        val_image_id = val_ann['image_id']
 
         for inf_ann in inference_annotations:
-            if val_image_id == inf_ann['image_id']:
-                inf_category_id = inf_ann['category_id']
-                inf_bbox = inf_ann['bbox']
-                iou = calculate_iou(val_bbox, inf_bbox)
-                if iou >= iou_threshold:
-                    category_name = category_colors[inf_category_id][1]
-                    x_min, y_min, x_max, y_max = inf_bbox
-                    draw.rectangle([(x_min, y_min), (x_max, y_max)], outline=category_colors[inf_category_id][0], width=3)
-                    draw_bbox_text(opt, draw, (x_min, y_min), category_name, category_colors[inf_category_id][0])
-    return image
+            inf_category_id = inf_ann['category_id']
+            inf_bbox = inf_ann['bbox']
+            inf_score = inf_ann['score']
+
+            # 이미 그려진 bbox는 무시
+            if tuple(inf_bbox) in drawn_bboxes:
+                continue
+
+            # threshold에 따른 조건 설정
+            if iou_flag:
+                if threshold != 0.00:
+                    if val_ann['category_id'] == inf_ann['category_id']:
+                        iou = calculate_iou(val_bbox, inf_bbox)
+                        if iou >= threshold:
+                            count += 1
+                            draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+                            drawn_bboxes.add(tuple(inf_bbox)) 
+                else:
+                    iou = calculate_iou(val_bbox, inf_bbox)
+                    if iou >= threshold:
+                        count += 1
+                        draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+                        drawn_bboxes.add(tuple(inf_bbox)) 
+            else:
+                if inf_score >= threshold:
+                    count += 1
+                    draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+                    drawn_bboxes.add(tuple(inf_bbox)) 
+
+    return image, count
 
 def main(opt):
     # st.set_page_config(layout="wide")
@@ -345,7 +370,7 @@ def main(opt):
             aug_method = A.Compose(augmentations, bbox_params=A.BboxParams(format='coco', label_fields=['category_ids']))
             image, annotations = apply_augmentation(image, annotations, aug_method)
 
-        image, annotation_table = draw_bbox(opt, image, annotations)
+        image, annotation_table = draw_train_bbox(opt, image, annotations)
 
         # 이미지 출력
         st.image(image)
@@ -450,17 +475,35 @@ def main(opt):
         image = Image.open(image_path)
         image_copy = image.copy()
 
-        train_image, _ = draw_bbox(opt, image, val_annotations)
+        train_image, _ = draw_train_bbox(opt, image, val_annotations)
     
+        st.subheader("IoU Threshold로 보는 EDA :rocket:")
         iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
-        inference_image = draw_bbox_iou(opt, image_copy, val_annotations ,inference_annotations, iou_threshold)
 
-        train_image_col, inference_image_col = st.columns([1, 1])
-        train_image_col.image(train_image)
-        train_image_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
+        st.write("Threshold가 0일 땐 모든 예측된 박스가 표시되며 그 외에는 validation 카테고리와 관련된 박스만 표시됩니다.")
+        inference_image, iou_count = draw_bbox_by_threshold(opt, image_copy, val_annotations ,inference_annotations, iou_threshold, iou_flag=True)
+
+        validation_image_iou_col, inference_image_iou_col = st.columns([1, 1])
+        validation_image_iou_col.image(train_image)
+        validation_image_iou_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
         
-        inference_image_col.image(inference_image)
-        inference_image_col.write(f"추론한 bbox의 갯수는 {len(inference_annotations)}개 입니다.")
+        inference_image_iou_col.image(inference_image)
+        inference_image_iou_col.write(f"추론한 bbox의 갯수는 {iou_count}개 입니다.")
+
+        ## confidence score
+        st.subheader("confidence score로 보는 EDA :fire:")
+        score_threshold = st.slider("Confidence Score Threshold", 0.0, 1.0, 0.5)
+        st.write("Threshold 이상의 confidence score를 가진 박스만 표시됩니다.")
+        inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, image_copy, val_annotations, inference_annotations, score_threshold, iou_flag=False)
+
+
+        validation_image_score_col, inference_image_score_col = st.columns([1, 1])
+        validation_image_score_col.image(train_image)
+        validation_image_score_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
+        
+        inference_image_score_col.image(inference_image_score)
+        inference_image_score_col.write(f"추론한 bbox의 갯수는 {confidence_score_count}개 입니다.")
+
 
 if __name__ == '__main__':
     opt = parse_args()
