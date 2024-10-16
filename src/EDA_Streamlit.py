@@ -264,42 +264,39 @@ def calculate_iou(val_bbox, inference_bbox):
 def draw_bbox_by_threshold(opt, image, val_annotations, inference_annotations, threshold, iou_flag):
     draw = ImageDraw.Draw(image)
     count = 0
-    drawn_bboxes = set()
 
-    for val_ann in val_annotations:
-        val_bbox = val_ann['bbox']
+    for inf_ann in inference_annotations:
+        inf_bbox = inf_ann['bbox']
+        inf_category_id = inf_ann['category_id']
+        inf_score = inf_ann['score']
 
-        for inf_ann in inference_annotations:
-            inf_category_id = inf_ann['category_id']
-            inf_bbox = inf_ann['bbox']
-            inf_score = inf_ann['score']
+        iou_max = 0
 
-            # 이미 그려진 bbox는 무시
-            if tuple(inf_bbox) in drawn_bboxes:
-                continue
+        if iou_flag:
+            for val_ann in val_annotations:
+                val_category_id = val_ann['category_id']
+                val_bbox = val_ann['bbox']
 
-            # threshold에 따른 조건 설정
-            if iou_flag:
-                if threshold != 0.00:
-                    if val_ann['category_id'] == inf_ann['category_id']:
-                        iou = calculate_iou(val_bbox, inf_bbox)
-                        if iou >= threshold:
-                            count += 1
-                            draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
-                            drawn_bboxes.add(tuple(inf_bbox)) 
-                else:
+                if val_category_id == inf_category_id:
                     iou = calculate_iou(val_bbox, inf_bbox)
                     if iou >= threshold:
-                        count += 1
-                        draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
-                        drawn_bboxes.add(tuple(inf_bbox)) 
-            else:
-                if inf_score >= threshold:
-                    count += 1
-                    draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
-                    drawn_bboxes.add(tuple(inf_bbox)) 
+                        iou_max = iou
+            # IoU가 설정된 threshold 이상인 bbox만 그리기
+            if iou_max >= threshold:
+                count += 1
+                draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
+
+        else:
+            if inf_score >= threshold:
+                count += 1
+                draw_bbox_comm(opt, draw, inf_bbox, inf_category_id)
 
     return image, count
+
+# def mAP(bboxes):
+#     for bbox in zip(bboxes):
+        
+
 
 def main(opt):
     # st.set_page_config(layout="wide")
@@ -473,7 +470,8 @@ def main(opt):
         inference_annotations = [ann for ann in inference_data if ann['image_id'] == image_id]
 
         image = Image.open(image_path)
-        image_copy = image.copy()
+        iou_image = image.copy()
+        score_image = image.copy()
 
         train_image, _ = draw_train_bbox(opt, image, val_annotations)
     
@@ -481,7 +479,7 @@ def main(opt):
         iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
 
         st.write("Threshold가 0일 땐 모든 예측된 박스가 표시되며 그 외에는 validation 카테고리와 관련된 박스만 표시됩니다.")
-        inference_image, iou_count = draw_bbox_by_threshold(opt, image_copy, val_annotations ,inference_annotations, iou_threshold, iou_flag=True)
+        inference_image, iou_count = draw_bbox_by_threshold(opt, iou_image, val_annotations ,inference_annotations, iou_threshold, iou_flag=True)
 
         validation_image_iou_col, inference_image_iou_col = st.columns([1, 1])
         validation_image_iou_col.image(train_image)
@@ -494,7 +492,7 @@ def main(opt):
         st.subheader("confidence score로 보는 EDA :fire:")
         score_threshold = st.slider("Confidence Score Threshold", 0.0, 1.0, 0.5)
         st.write("Threshold 이상의 confidence score를 가진 박스만 표시됩니다.")
-        inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, image_copy, val_annotations, inference_annotations, score_threshold, iou_flag=False)
+        inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, score_image, val_annotations, inference_annotations, score_threshold, iou_flag=False)
 
 
         validation_image_score_col, inference_image_score_col = st.columns([1, 1])
