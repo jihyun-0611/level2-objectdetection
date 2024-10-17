@@ -482,7 +482,10 @@ def mean_average_precision_for_boxes(ann, pred, iou_threshold=0.5):
     print('Detections length: {}'.format(len(all_detections)))
     print('Annotations length: {}'.format(len(all_annotations)))
 
-    fig, axs = plt.subplots(2, 5, figsize=(20, 8))
+    num_classes = len(unique_classes)
+    rows = (num_classes + 4) // 5
+
+    fig, axs = plt.subplots(rows, 5, figsize=(20, 4 * rows))
     axs = axs.ravel() 
 
     average_precisions = {}
@@ -587,6 +590,10 @@ def mean_average_precision_for_boxes(ann, pred, iou_threshold=0.5):
         mean_ap = 0.0  # Or handle this case as needed (e.g., log a message or raise an exception)
         
     print('mAP: {:.6f}'.format(mean_ap))
+
+    if num_classes < len(axs):
+        for j in range(num_classes, len(axs)):
+            fig.delaxes(axs[j])
 
     return mean_ap, average_precisions, fig
 
@@ -742,16 +749,21 @@ def main(opt):
         if 'inference_image_index' not in st.session_state:
             st.session_state.inference_image_index = 0
 
-        st.title("inference EDA")
+        if 'mean_ap' not in st.session_state:
+            st.title("inference EDA")
+            st.subheader("전체 inference bbox에 대한 카테고리 별 AP")
 
-        st.subheader("전체 inference bbox에 대한 카테고리 별 AP")
+            # AP 계산: 이미 저장되어 있지 않은 경우에만 수행
+            validation_data_for_ap = convert_coco_to_df(opt.validation_path, is_prediction=False)
+            inference_data_for_ap = convert_coco_to_df(opt.inference_path, is_prediction=True)
 
-        validation_data_for_ap = convert_coco_to_df(opt.validation_path, is_prediction=False)
-        inference_data_for_ap = convert_coco_to_df(opt.inference_path, is_prediction=True)
+            mean_ap, average_precisions, plot_ap = mean_average_precision_for_boxes(validation_data_for_ap, inference_data_for_ap, 0.5)
+            st.session_state.mean_ap = mean_ap
+            st.session_state.plot_ap = plot_ap
 
-        mean_ap, average_precisions, plot_ap = mean_average_precision_for_boxes(validation_data_for_ap, inference_data_for_ap, 0.5)
-        st.write(f"mAP : {mean_ap}")
-        st.pyplot(plot_ap)
+        # mAP와 플롯 표시
+        st.write(f"mAP : {st.session_state.mean_ap}")
+        st.pyplot(st.session_state.plot_ap)
 
         # 버튼으로 이미지 이동
         prev_button, next_button = st.columns([1, 1])
