@@ -9,6 +9,7 @@ import albumentations as A
 import pandas as pd
 import cv2
 import seaborn as sns
+from collections import defaultdict
 
 def parse_args():
     parser = argparse.ArgumentParser(description='EDA with Streamlit')
@@ -32,6 +33,10 @@ category_colors = {
     8: ["brown", "Battery"],       
     9: ["pink", "Clothing"]         
 }
+
+
+LABEL_NAME = ["General trash", "Paper", "Paper pack", "Metal",
+              "Glass", "Plastic", "Styrofoam", "Plastic bag", "Battery", "Clothing"]
 
 def load_train_json(dataset_path):
     with open(os.path.join(dataset_path, 'train.json'), 'r') as f:
@@ -243,6 +248,7 @@ def bbox_area_viz(bbox_area, selected_category):
     
     return fig, count_bbox_area
 
+# 하나의 이미지 내에 있는 bbox들의 IoU 계산
 def calculate_iou(val_bbox, inference_bbox):
     val_x_min, val_y_min, val_x_max, val_y_max = calculate_bbox(val_bbox)
     inf_x_min, inf_y_min, inf_x_max, inf_y_max = calculate_bbox(inference_bbox)
@@ -261,7 +267,52 @@ def calculate_iou(val_bbox, inference_bbox):
 
     return iou
 
+# 전체 IoU 계산 (벡터화)
+def compute_iou(boxes, query_boxes):
+    """
+    Args:
+        a: (N, 4) ndarray of float
+        b: (K, 4) ndarray of float
+    Returns:
+        overlaps: (N, K) ndarray of overlap between boxes and query_boxes
+    """
+
+    N = boxes.shape[0]
+    K = query_boxes.shape[0]
+    overlaps = np.zeros((N, K), dtype=np.float64)
+    for k in range(K):
+        box_area = (
+            (query_boxes[k, 2] - query_boxes[k, 0]) *
+            (query_boxes[k, 3] - query_boxes[k, 1])
+        )
+        for n in range(N):
+            iw = (
+                min(boxes[n, 2], query_boxes[k, 2]) -
+                max(boxes[n, 0], query_boxes[k, 0])
+            )
+            if iw > 0:
+                ih = (
+                    min(boxes[n, 3], query_boxes[k, 3]) -
+                    max(boxes[n, 1], query_boxes[k, 1])
+                )
+                if ih > 0:
+                    ua = np.float64(
+                        (boxes[n, 2] - boxes[n, 0]) *
+                        (boxes[n, 3] - boxes[n, 1]) +
+                        box_area - iw * ih
+                    )
+                        ### YOUR CODE HERE
+                        ### ANSWER HERE ###
+                        # 구현해야 할 변수 : overlaps[n, k]
+                        # overlaps[n, k]
+                    overlaps[n, k] = (iw * ih) / ua
+
+
+    return overlaps
+
+# IoU 기준으로 bbox 그리기
 def draw_bbox_by_threshold(opt, image, val_annotations, inference_annotations, threshold, iou_flag):
+    
     draw = ImageDraw.Draw(image)
     count = 0
 
@@ -293,10 +344,258 @@ def draw_bbox_by_threshold(opt, image, val_annotations, inference_annotations, t
 
     return image, count
 
-# def mAP(bboxes):
-#     for bbox in zip(bboxes):
-        
+# coco json 파일을 mean_average_precision_for_boxes에 맞게 변환
+def convert_coco_to_df(coco_json, is_prediction=False):
+    data = json.load(open(coco_json))
+    if is_prediction:
+        records = [
+            {
+                'ImageID': item['image_id'],
+                'LabelName': item['category_id'],
+                'Conf': item['score'],
+                'XMin': item['bbox'][0],
+                'YMin': item['bbox'][1],
+                'XMax': item['bbox'][2],
+                'YMax': item['bbox'][3]
+            }
+            for item in data
+        ]
+    else:
+        records = [
+            {
+                'ImageID': item['image_id'],
+                'LabelName': item['category_id'],
+                'XMin': item['bbox'][0],
+                'YMin': item['bbox'][1],
+                'XMax': item['bbox'][0] + item['bbox'][2],
+                'YMax': item['bbox'][1] + item['bbox'][3]
+            }
+            for item in data['annotations']
+        ]
 
+    return pd.DataFrame(records)
+
+def _compute_ap(recall, precision):
+    """ Compute the average precision, given the recall and precision curves.
+    Code originally from https://github.com/rbgirshick/py-faster-rcnn.
+    # Arguments
+        recall:    The recall curve (list).
+        precision: The precision curve (list).
+    # Returns
+        The average precision as computed in py-faster-rcnn.
+    """
+    # correct AP calculation
+    # first append sentinel values at the end
+    mrec = np.concatenate(([0.], recall, [1.]))
+    mpre = np.concatenate(([0.], precision, [0.]))
+
+    # compute the precision envelope
+    for i in range(mpre.size - 1, 0, -1):
+        mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+
+    # to calculate area under PR curve, look for points
+    # where X axis (recall) changes value
+    i = np.where(mrec[1:] != mrec[:-1])[0]
+
+    # and sum (\Delta recall) * prec
+    ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    return ap
+
+def get_real_annotations(table):
+    res = dict()
+    ids = table['ImageID'].values.astype(np.str_)
+    labels = table['LabelName'].values.astype(np.str_)
+    xmin = table['XMin'].values.astype(np.float32)
+    xmax = table['XMax'].values.astype(np.float32)
+    ymin = table['YMin'].values.astype(np.float32)
+    ymax = table['YMax'].values.astype(np.float32)
+
+    for i in range(len(ids)):
+        id = ids[i]
+        label = labels[i]
+        if id not in res:
+            res[id] = dict()
+        if label not in res[id]:
+            res[id][label] = []
+        box = [xmin[i], ymin[i], xmax[i], ymax[i]]
+        res[id][label].append(box)
+
+    return res
+
+def get_detections(table):
+    res = dict()
+    ids = table['ImageID'].values.astype(np.str_)
+    labels = table['LabelName'].values.astype(np.str_)
+    scores = table['Conf'].values.astype(np.float32)
+    xmin = table['XMin'].values.astype(np.float32)
+    xmax = table['XMax'].values.astype(np.float32)
+    ymin = table['YMin'].values.astype(np.float32)
+    ymax = table['YMax'].values.astype(np.float32)
+
+    for i in range(len(ids)):
+        id = ids[i]
+        label = labels[i]
+        if id not in res:
+            res[id] = dict()
+        if label not in res[id]:
+            res[id][label] = []
+        box = [xmin[i], ymin[i], xmax[i], ymax[i], scores[i]]
+        res[id][label].append(box)
+
+    return res
+
+def mean_average_precision_for_boxes(ann, pred, iou_threshold=0.5):
+    """
+    :param ann: path to CSV-file with annotations or numpy array of shape (N, 6)
+    :param pred: path to CSV-file with predictions (detections) or numpy array of shape (N, 7)
+    :param iou_threshold: IoU between boxes which count as 'match'. Default: 0.5
+    :return: tuple, where first value is mAP and second values is dict with AP for each class.
+    """
+
+    if isinstance(ann, str):
+        valid = pd.read_csv(ann)
+    else:
+        valid = pd.DataFrame(ann, columns=['ImageID', 'LabelName', 'XMin', 'XMax', 'YMin', 'YMax'])
+
+    if isinstance(pred, str):
+        preds = pd.read_csv(pred)
+    else:
+        preds = pd.DataFrame(pred, columns=['ImageID', 'LabelName', 'Conf', 'XMin', 'XMax', 'YMin', 'YMax'])
+
+# ImageID에 파일 경로 추가 및 4자리 zero-padding 적용
+    valid['ImageID'] = valid['ImageID'].apply(lambda x: f'train/{str(x).zfill(4)}.jpg')
+    preds['ImageID'] = preds['ImageID'].apply(lambda x: f'train/{str(x).zfill(4)}.jpg')
+
+    ann_unique = valid['ImageID'].unique()
+    preds_unique = preds['ImageID'].unique()
+
+    print('Number of files in annotations: {}'.format(len(ann_unique)))
+    print('Number of files in predictions: {}'.format(len(preds_unique)))
+
+    unique_classes = valid['LabelName'].unique().astype(np.str_)
+
+    print('Unique classes: {}'.format(len(unique_classes)))
+
+    all_detections = get_detections(preds)
+    all_annotations = get_real_annotations(valid)
+
+    print('Detections length: {}'.format(len(all_detections)))
+    print('Annotations length: {}'.format(len(all_annotations)))
+
+    num_classes = len(unique_classes)
+    rows = (num_classes + 4) // 5
+
+    fig, axs = plt.subplots(rows, 5, figsize=(20, 4 * rows))
+    axs = axs.ravel() 
+
+    average_precisions = {}
+    for idx, label in enumerate(sorted(unique_classes)):
+
+        # Negative class
+        if str(label) == 'nan':
+            continue
+
+        false_positives = []
+        true_positives = []
+        scores = []
+        num_annotations = 0.0
+
+        for i in range(len(ann_unique)):
+            detections = []
+            annotations = []
+            id = ann_unique[i]
+            if id in all_detections:
+                if label in all_detections[id]:
+                    detections = all_detections[id][label]
+            if id in all_annotations:
+                if label in all_annotations[id]:
+                    annotations = all_annotations[id][label]
+
+            if len(detections) == 0 and len(annotations) == 0:
+                continue
+            num_annotations += len(annotations)
+            detected_annotations = []
+
+            annotations = np.array(annotations, dtype=np.float64)
+            for d in detections:
+                scores.append(d[4])
+
+                if len(annotations) == 0:
+                    false_positives.append(1)
+                    true_positives.append(0)
+                    continue
+
+                overlaps = compute_iou(np.expand_dims(np.array(d, dtype=np.float64), axis=0), annotations)
+                assigned_annotation = np.argmax(overlaps, axis=1)
+                max_overlap = overlaps[0, assigned_annotation]
+
+                if max_overlap >= iou_threshold and assigned_annotation not in detected_annotations:
+                    false_positives.append(0)
+                    true_positives.append(1)
+                    detected_annotations.append(assigned_annotation)
+                else:
+                    false_positives.append(1)
+                    true_positives.append(0)
+
+        if num_annotations == 0:
+            average_precisions[label] = 0, 0
+            continue
+
+        false_positives = np.array(false_positives)
+        true_positives = np.array(true_positives)
+        scores = np.array(scores)
+
+        # sort by score
+        indices = np.argsort(-scores)
+        false_positives = false_positives[indices]
+        true_positives = true_positives[indices]
+
+        # compute false positives and true positives
+        false_positives = np.cumsum(false_positives)
+        true_positives = np.cumsum(true_positives)
+
+        # compute recall and precision
+        ### YOUR CODE HERE
+        ### ANSWER HERE ###
+        recall = true_positives / num_annotations
+        precision = true_positives / (true_positives + false_positives)
+
+        # 각 label 별로 PR curve plot
+        axs[idx].plot(recall, precision)
+        axs[idx].set_title(f'{LABEL_NAME[int(label)]} PR curve', fontsize=15)
+        axs[idx].set_xlabel('Recall', fontsize=12)
+        axs[idx].set_ylabel('Precision', fontsize=12)
+
+        # compute average precision
+        average_precision = _compute_ap(recall, precision)
+        average_precisions[label] = average_precision, num_annotations
+
+        s1 = "{:10s} | {:.6f} | {:7d}".format(LABEL_NAME[int(label)], average_precision, int(num_annotations))
+        print(s1)
+
+        axs[idx].text(0.5, 0.1, f'AP: {average_precision:.4f}', fontsize=12, transform=axs[idx].transAxes, ha='center', color='blue')
+    
+    plt.tight_layout()
+    present_classes = 0
+    precision = 0
+    for label, (average_precision, num_annotations) in average_precisions.items():
+        if num_annotations > 0:
+            present_classes += 1
+            precision += average_precision
+
+    # Compute the final mean average precision
+    if present_classes > 0:
+        mean_ap = precision / present_classes
+    else:
+        mean_ap = 0.0  # Or handle this case as needed (e.g., log a message or raise an exception)
+        
+    print('mAP: {:.6f}'.format(mean_ap))
+
+    if num_classes < len(axs):
+        for j in range(num_classes, len(axs)):
+            fig.delaxes(axs[j])
+
+    return mean_ap, average_precisions, fig
 
 def main(opt):
     # st.set_page_config(layout="wide")
@@ -307,7 +606,7 @@ def main(opt):
     dataset_path = opt.dataset_path
     train_data = load_train_json(dataset_path)
 
-    validation_path = load_json(opt.validation_path)
+    validation_data = load_json(opt.validation_path)
 
     inference_data = load_json(opt.inference_path)
 
@@ -316,7 +615,7 @@ def main(opt):
     # json 파일에서 이미지 파일명, id를 추출
     image_files, image_ids = zip(*[(img['file_name'], img['id']) for img in train_data['images']])
 
-    val_image_files, val_image_ids = zip(*[(img['file_name'], img['id']) for img in validation_path['images']])
+    val_image_files, val_image_ids = zip(*[(img['file_name'], img['id']) for img in validation_data['images']])
 
     if menu == "Train 데이터 시각화 확인하기":
         if 'image_index' not in st.session_state:
@@ -452,6 +751,21 @@ def main(opt):
 
         st.title("inference EDA")
 
+        if 'mean_ap' not in st.session_state:
+            st.subheader("전체 inference bbox에 대한 카테고리 별 AP")
+
+            # AP 계산: 이미 저장되어 있지 않은 경우에만 수행
+            validation_data_for_ap = convert_coco_to_df(opt.validation_path, is_prediction=False)
+            inference_data_for_ap = convert_coco_to_df(opt.inference_path, is_prediction=True)
+
+            mean_ap, average_precisions, plot_ap = mean_average_precision_for_boxes(validation_data_for_ap, inference_data_for_ap, 0.5)
+            st.session_state.mean_ap = mean_ap
+            st.session_state.plot_ap = plot_ap
+
+        # mAP와 플롯 표시
+        st.write(f"mAP : {st.session_state.mean_ap}")
+        st.pyplot(st.session_state.plot_ap)
+
         # 버튼으로 이미지 이동
         prev_button, next_button = st.columns([1, 1])
 
@@ -466,7 +780,7 @@ def main(opt):
 
         # 선택한 이미지에 대한 annotation 정보 추출
         image_id = val_image_ids[st.session_state.inference_image_index]
-        val_annotations = [ann for ann in train_data['annotations'] if ann['image_id'] == image_id]
+        val_annotations = [ann for ann in validation_data['annotations'] if ann['image_id'] == image_id]
         inference_annotations = [ann for ann in inference_data if ann['image_id'] == image_id]
 
         image = Image.open(image_path)
@@ -474,7 +788,7 @@ def main(opt):
         score_image = image.copy()
 
         train_image, _ = draw_train_bbox(opt, image, val_annotations)
-    
+
         st.subheader("IoU Threshold로 보는 bbox :rocket:")
         iou_threshold = st.slider("IoU Threshold", 0.0, 1.0, 0.5)
 
@@ -494,14 +808,12 @@ def main(opt):
         st.write("Threshold 이상의 confidence score를 가진 박스만 표시됩니다.")
         inference_image_score, confidence_score_count = draw_bbox_by_threshold(opt, score_image, val_annotations, inference_annotations, score_threshold, iou_flag=False)
 
-
         validation_image_score_col, inference_image_score_col = st.columns([1, 1])
         validation_image_score_col.image(train_image)
         validation_image_score_col.write(f"선택한 vaildation bbox의 갯수는 {len(val_annotations)}개 입니다.")
         
         inference_image_score_col.image(inference_image_score)
         inference_image_score_col.write(f"추론한 bbox의 갯수는 {confidence_score_count}개 입니다.")
-
 
 if __name__ == '__main__':
     opt = parse_args()
