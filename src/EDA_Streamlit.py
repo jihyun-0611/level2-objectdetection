@@ -749,8 +749,9 @@ def main(opt):
         if 'inference_image_index' not in st.session_state:
             st.session_state.inference_image_index = 0
 
+        st.title("inference EDA")
+
         if 'mean_ap' not in st.session_state:
-            st.title("inference EDA")
             st.subheader("전체 inference bbox에 대한 카테고리 별 AP")
 
             # AP 계산: 이미 저장되어 있지 않은 경우에만 수행
@@ -813,7 +814,6 @@ def main(opt):
         
         inference_image_score_col.image(inference_image_score)
         inference_image_score_col.write(f"추론한 bbox의 갯수는 {confidence_score_count}개 입니다.")
-
 
 if __name__ == '__main__':
     opt = parse_args()
