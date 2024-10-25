@@ -22,6 +22,7 @@
 - 2024.10.19 ~ 2024.10.21 : Wandb 연동
 - 2024.10.20 ~ 2024.10.24 : 모델 앙상블 실험
 - 2024.10.20 ~ 2024.10.24 : 모델 평가
+<img src="https://github.com/user-attachments/assets/0a1e2d2c-06ba-4ee4-b7a5-620226b9546e" width="500"/>
 
 <br />
 
