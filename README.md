@@ -12,7 +12,7 @@
     </div>
     </picture>
     <div align="center">
-        <img src="https://github.com/user-attachments/assets/7c6a4a88-9183-47f0-aa37-b57012021701" width="600"/>
+        <img src="https://github.com/user-attachments/assets/7c6a4a88-9183-47f0-aa37-b57012021701" width="800"/>
     </div>
 </p>
 
