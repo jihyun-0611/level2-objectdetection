@@ -12,7 +12,7 @@
     </div>
     </picture>
     <div align="center">
-        <img src="https://github.com/user-attachments/assets/7c6a4a88-9183-47f0-aa37-b57012021701" width="800"/>
+        <img src="https://github.com/user-attachments/assets/7c6a4a88-9183-47f0-aa37-b57012021701" width="600"/>
     </div>
 </p>
 
@@ -23,7 +23,7 @@
 있습니다. 분리배출 된 쓰레기는 자원으로서 가치를 가지지만, 잘못 분리배출 되면 그대로 폐기물로 분류되어 매립 또는 소각되기 때문입니다. 따라서 이번
 프로젝트에서는 올바른 분리배출을 위해 쓰레기를 정확히 탐지하는 Object Detection  모델
 제작을 목표로 합니다.
- 데이터 셋은 일반 쓰레기, 플라스틱, 종이, 유리 등 10 종류의 쓰레기가 찍힌 사진을 사용합니다.
+ 데이터 셋은 일반 쓰레기, 플라스틱, 종이, 유리 등 10 종류의 쓰레기가 찍힌 사진을 사용하며, mAP 50을 통해 평가를 진행합니다.
 
 <br />
 
@@ -43,6 +43,14 @@
 ## 🕵️ 프로젝트 파이프라인 
 
 <img src="https://github.com/user-attachments/assets/18bbfe98-bd9e-4bce-9ca1-90fa21072e0b" width="500"/>
+
+각 파이프라인에 대한 상세한 내용은 아래 링크를 통해 확인할 수 있습니다.
+
+- [MLFlow 및 Wandb 연동](..)
+- [데이터 EDA 및 Streamlit 시각화](..)
+- [CV 전략 구축](..)
+- [모델 실험 및 평가](..)
+- [모델 앙상블 실험](..)
 
 <br />
 
@@ -159,8 +167,28 @@ project
     ├── ensemble.py
     └── make_val_dataset.ipynb
 ```
-
-
+### 2. EDA
+#### 2-1. Streamlit
+- Train data 및 inference 결과의 EDA을 위해 Streamlit을 활용했습니다. Streamlit을 통해 EDA를 진행하기 위해 다음을 실행하세요.
+  ```bash
+  bash EDA_Streamlit.sh
+  ```
+  - 실행을 위해 다음의 인자가 필요합니다.
+      - **dataset_path** : dataset 경로
+      - **font_path** : bbox의 시각화를 위한 font 경로 (우리의 Repository에 있는 arial.ttf을 이용하세요)
+      - **inference_path** : inference json 파일 경로
+      - **validation_path** : validation json 파일 경로
+  - 데모 실행을 위해 validation_json, inference_json directory에 데모 json 파일이 있습니다.
+#### 2-2. confusion_matrix
+- confusion_matrix에 대한 시각화입니다. (만드신 분 관련 내용 적어주세요)
+        
+### 3. Train and inference
+- 프로젝트를 위해 mmdetection V2 및 V3, Detectron2를 사용했습니다. 각 라이브러리에 해당하는 directory에 train과 inference를 위한 코드가 있습니다.
+- 해당 코드들을 사용하기 위해 mmdetection 및 Detectron2 라이브러리에 포함된 config 파일이 필요합니다. 밑의 링크들을 통해 config 파일과 그에 필요한 구성 요소들을 clone할 수 있습니다.
+  
+  - [mmdetection](https://github.com/open-mmlab/mmdetection) 
+  - [Detectron2](https://github.com/facebookresearch/detectron2)
+- [라이브러리명]_val.py 파일은 Streamlit 시각화를 위해 validation inference 결과에 대한 json 파일을 추출하는 코드입니다. Detectron2의 경우 detectron2_inference.py를 통해 json 파일을 추출할 수 있습니다. 
 <br />
 
 ## 🧑‍🤝‍🧑 Contributors
