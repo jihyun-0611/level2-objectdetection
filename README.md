@@ -193,7 +193,40 @@ project
 <br />
 
 ### 4. ensemble
-- 앙상블 내용 적어주세요
+- 앙상블을 사용하기 위해 다음을 실행하세요.
+```bash
+python ./src/ensemble.py
+```
+
+아래 변수 값을 수정하여 csv 파일 및 json 저장경로를 지정할 수 있습니다.
+```python3
+root = ['*.csv',] # 앙상블을 진행할 csv 파일을 지정합니다.
+submission_dir = '../../submission/' # csv 파일이 저장된 경로 및 앙상블 후 저장할 경로를 지정합니다.
+annotation = '../../dataset/test.json' # 앙상블에 사용하기 위해 file의 image 정보가 포함된 json 파일 경로를 지정합니다.
+```
+
+아래 변수 값을 수정하여 앙상블 기법 및 수치를 지정할 수 있습니다.
+```python3
+ensemble_type = '' #[nms, wbf, nmw, soft-nms] 중 사용할 앙상블 기법을 선택합니다. 
+iou_thr = 0.5 #iou threshold 값을 설정합니다.
+
+# WBF 기법 설정 값
+wbf_conf_type='avg' # ['avg', 'max', 'box_and_model_avg', 'absent_model_aware_avg'] # WBF 기법 수행 시 신뢰도 계산 방법을 설정 값입니다.
+wbf_allows_overflow = False # {True: 가중치 합 > 1, False: 가중치 합 1로 고정} # 가중치 합을 1을 초과하거나 1로 고정 하는 설정 값입니다.
+wbf_skip_box_thr = 0.0 # 값에 해당하는 정확도가 넘지 않으면 제외하는 설정 값입니다.
+
+# Soft-NMS 기법 설정 값
+method = 2 # 1 - linear soft-NMS, 2 - gaussian soft-NMS, 3 - standard NMS 기본값: 2  # Soft-NMS의 방식을 선택하는 설정 값입니다.
+sn_sigma = 0.5 # Gaussian soft-NMS 방식 사용 시 분산을 설정하는 값입니다. 
+sn_thresh = 0.001 # 값에 해당하는 신뢰도 미만의 Box를 제거하는 설정 값입니다.
+
+
+weights = [1] * len(submission_df) # 각 모델의 동일한 가중치 1을 고정하는 설정 값입니다. None으로 설정 시 각 모델에 적용된 가중치로 진행됩니다. 
+
+```
+
+해당 코드들은 Weighted-Boxes-Fusion GitHub 내 ensemble_boxes 라이브러리가 포함되어 있습니다.
+- [Weighted-Boxes-Fusion](https://github.com/ZFTurbo/Weighted-Boxes-Fusion)  
 
 ## 🧑‍🤝‍🧑 Contributors
 <div align="center">
