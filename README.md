@@ -1,12 +1,32 @@
 
 # 🏆 Recyclables Object Detection
+<p align="center">
+    </picture>
+    <div align="center">
+        <img src="https://img.shields.io/badge/Python-FFD43B?style=for-the-badge&logo=python&logoColor=blue">
+        <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white">
+        <img src="https://img.shields.io/badge/W&B-FFBE00.svg?style=for-the-badge&logo=weightsandbiases&logoColor=white">
+        <img src="https://img.shields.io/badge/mlflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white">
+        <img src="https://img.shields.io/badge/streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white">
+        <img src="https://img.shields.io/badge/tmux-1BB91F?style=for-the-badge&logo=tmux&logoColor=white">
+    </div>
+    </picture>
+    <div align="center">
+        <img src="https://github.com/user-attachments/assets/7c6a4a88-9183-47f0-aa37-b57012021701" width="500"/>
+    </div>
+</p>
 
 <br />
 
 ## ✏️ Introduction
-바야흐로 대량 생산, 대량 소비의 시대. 우리는 많은 물건이 대량으로 생산되고, 소비되는 시대를 살고 있습니다. 하지만 이러한 문화는 '쓰레기 대란', '매립지 부족'과 같은 여러 사회 문제를 낳고 있습니다. 분리수거는 이러한 환경 부담을 줄일 수 있는 방법 중 하나입니다. 잘 분리배출 된 쓰레기는 자원으로서 가치를 인정받아 재활용되지만, 잘못 분리배출 되면 그대로 폐기물로 분류되어 매립 또는 소각되기 때문입니다.
-따라서 우리는 사진에서 쓰레기를 Detection 하는 모델을 만들어 이러한 문제점을 해결해보고자 합니다. 문제 해결을 위한 데이터셋으로는 일반 쓰레기, 플라스틱, 종이, 유리 등 10 종류의 쓰레기가 찍힌 사진 데이터셋이 제공됩니다.
-여러분에 의해 만들어진 우수한 성능의 모델은 쓰레기장에 설치되어 정확한 분리수거를 돕거나, 어린아이들의 분리수거 교육 등에 사용될 수 있을 것입니다. 부디 지구를 위기로부터 구해주세요! 🌎
+대량 생산과 대량 소비의 시대에서 환경 부담을 줄일 수 있는 분리수거의 중요성이 더욱 강조되고
+있다. 잘못 분리배출 되면 그대로 폐기물로 분류되어 매립 또는 소각되기 때문이다. 따라서 이번
+프로젝트에서는 올바른 분리배출을 위해 쓰레기를 정확히 탐지하는 Object Detection  모델
+제작을 목표로 한다.
+ 데이터 셋은 일반 쓰레기, 플라스틱, 종이, 유리 등 10 종류의 쓰레기가 찍힌 사진을 사용한다. 학습
+데이터 4,883 장,  평가 데이터 4,871 장으로 구성되어 있으며 이미지는 모두 (1024, 1024)
+크기로 제공된다.
+
 <br />
 
 ## 📅 Schedule
@@ -14,14 +34,8 @@
 
 - 2024.10.02 ~ 2024.10.24
 
-프로젝트 세부 일정
+프로젝트 파이프라인 
 
-- 2024.10.02 ~ 2024.10.11 : MLFlow 연동
-- 2024.10.02 ~ 2024.10.17 : 데이터 EDA 및 Streamlit
-- 2024.10.10 ~ 2024.10.24 : Model 실험
-- 2024.10.19 ~ 2024.10.21 : Wandb 연동
-- 2024.10.20 ~ 2024.10.24 : 모델 앙상블 실험
-- 2024.10.20 ~ 2024.10.24 : 모델 평가
 <img src="https://github.com/user-attachments/assets/0a1e2d2c-06ba-4ee4-b7a5-620226b9546e" width="500"/>
 
 <br />
@@ -32,7 +46,7 @@
 
 <br />
 
-## 🗃️ Dataset
+## 🗃️ Project Structure
 ```
 data/
 │
