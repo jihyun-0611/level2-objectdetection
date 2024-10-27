@@ -127,9 +127,10 @@ dataset/
 이 프로젝트는 Ubuntu 20.04.6 LTS, CUDA Version: 12.2, Tesla v100 32GB의 환경에서 훈련 및 테스트되었습니다.
 
 ### Installment
-또한, 이 프로젝트에는 다앙한 라이브러리가 필요합니다. 다음 단계를 따라 필요한 모든 의존성을 설치할 수 있습니다.
+또한, 이 프로젝트에는 다앙한 라이브러리가 필요합니다. 다음 단계를 따라 필요한 모든 라이브러리를 설치할 수 있습니다.
 ``` bash
-  git clone https://github.com/boostcampaitech7/level2-imageclassification-cv-23.git
+  git clone https://github.com/boostcampaitech7/level2-objectdetection-cv-23.git
+  cd level2-objectdetection-cv-23
   pip install -r requirements.txt
 ```
 
