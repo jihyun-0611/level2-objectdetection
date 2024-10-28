@@ -181,7 +181,9 @@ project
       - **validation_path** : validation json 파일 경로
   - 데모 실행을 위해 validation_json, inference_json directory에 데모 json 파일이 있습니다.
 #### 2-2. confusion_matrix
-- confusion_matrix에 대한 시각화입니다. (만드신 분 관련 내용 적어주세요)
+- Confusion matrix를 시각화하기 위해 confusion_matrix_trash.py 코드를 추가하였습니다.
+- 해당 코드는 validation inference 시 confusion matrix도 함께 출력하기 위한 코드로 직접 실행하지 않고 val.py에서 import해 사용합니다. mmdetectionv2_val.py에서 confusion matrix를 출력하는 코드를 확인하실 수 있습니다.
+- mmdetectionv2_val.py를 실행하면 추론 결과를 담은 json 파일, confusion_matrix를 위한 pickel파일, confusion_matrix png파일이 함께 저장됩니다.
         
 ### 3. Train and inference
 - 프로젝트를 위해 mmdetection V2 및 V3, Detectron2를 사용했습니다. 각 라이브러리에 해당하는 directory에 train과 inference를 위한 코드가 있습니다.
@@ -247,4 +249,4 @@ weights = [1] * len(submission_df) # 각 모델의 동일한 가중치 1을 고�
 </div>
 
 ## ⚡️ Detail   
-- 프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level1-imageclassification-cv-23/blob/b21747b156fd301b04d122964c8d4433777f75b7/utils/CV%EA%B8%B0%EC%B4%88%EB%8C%80%ED%9A%8C_CV_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(23%EC%A1%B0).pdf) 에서 확인할 수 있습니다.
+- 프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level2-objectdetection-cv-23/blob/main/docs/CV_23_WrapUp_Report_detection.pdf) 에서 확인할 수 있습니다.
