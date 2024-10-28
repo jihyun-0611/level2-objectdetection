@@ -110,13 +110,6 @@ elif isinstance(results[0], tuple):
 else:
     raise TypeError('invalid type of prediction results')
 
-if isinstance(cfg.data.test, dict):
-    cfg.data.test.test_mode = True
-elif isinstance(cfg.data.test, list):
-    for ds_cfg in cfg.data.test:
-        ds_cfg.test_mode = True
-dataset = build_dataset(cfg.data.test)
-
 # score_thr : confidence score가 score_thr 이하인 경우 배경 클래스로 예측한 것으로 봄(mmdetection tools의 default: 0.3)
 confusion_matrix = calculate_confusion_matrix(dataset, results, score_thr=0.3)
 
