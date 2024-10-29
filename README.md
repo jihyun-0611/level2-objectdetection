@@ -42,20 +42,20 @@
 
 ## 🕵️ 프로젝트 파이프라인 
 
-<img src="https://github.com/user-attachments/assets/18bbfe98-bd9e-4bce-9ca1-90fa21072e0b" width="500"/>
+<img src="https://github.com/user-attachments/assets/5300dad3-8e0f-4927-ade9-241b01771e6d" width="500"/>
 
 각 파이프라인에 대한 상세한 내용은 아래 링크를 통해 확인할 수 있습니다.
 
-- [MLFlow 및 Wandb 연동](..)
-- [데이터 EDA 및 Streamlit 시각화](..)
-- [CV 전략 구축](..)
-- [모델 실험 및 평가](..)
-- [모델 앙상블 실험](..)
+- [MLFlow 및 Wandb 연동](https://shadowed-fact-f9b.notion.site/Wandb-with-mmdection-train-8854fc9596a743ebb7ecdbb894dbd807?pvs=4)
+- [데이터 EDA 및 Streamlit 시각화](https://shadowed-fact-f9b.notion.site/EDA-Streamlit-bd10bb80c7704431b27c05929899bc4e?pvs=4)
+- [Validation 전략 구축](https://shadowed-fact-f9b.notion.site/Validation-d56cc4f852334249905ef1c99b05133d?pvs=4)
+- [모델 실험 및 평가](https://shadowed-fact-f9b.notion.site/4287a4ea70f145739bf45738ae35051d?pvs=4)
+- [모델 앙상블 실험](https://shadowed-fact-f9b.notion.site/ensemble-ca0522e34a544108a8f2b1ff66ca7ed3?pvs=4)
 
 <br />
 
 ## 🥈 Result
-- Private 리더보드에서 최종적으로 아래와 같은 결과를 얻었습니다.
+Private 리더보드에서 최종적으로 아래와 같은 결과를 얻었습니다.
 <img align="center" src="https://github.com/user-attachments/assets/56eeeef8-5270-4350-b0db-c6546519a9ea" width="600" height="50">
 
 <br />
@@ -84,40 +84,40 @@ dataset/
 
 ### Train & Test json
 
-- Train json 파일은 coco format을 따르며 Info, licenses, images, categories, annotations로 구성되어 있습니다.
-  - Images
-    ```json
-      "images": [
-      {
-        "width": 1024,
-        "height": 1024,
-        "file_name": "train/0000.jpg",
-        "license": 0,
-        "flickr_url": null,
-        "coco_url": null,
-        "date_captured": "2020-12-26 14:44:23",
-        "id": 0
-      },
-      ...
-    ```
-  - Annotation
-    ```json
-        "annotations": [
-      {
-        "image_id": 0,
-        "category_id": 0,
-        "area": 257301.66,
-        "bbox": [
-          197.6,
-          193.7,
-          547.8,
-          469.7
-        ],
-        "iscrowd": 0,
-        "id": 0
-      },
-      ...
-    ```
+Train json 파일은 coco format을 따르며 Info, licenses, images, categories, annotations로 구성되어 있습니다.
+- Images
+  ```json
+    "images": [
+    {
+      "width": 1024,
+      "height": 1024,
+      "file_name": "train/0000.jpg",
+      "license": 0,
+      "flickr_url": null,
+      "coco_url": null,
+      "date_captured": "2020-12-26 14:44:23",
+      "id": 0
+    },
+    ...
+  ```
+- Annotation
+  ```json
+      "annotations": [
+    {
+      "image_id": 0,
+      "category_id": 0,
+      "area": 257301.66,
+      "bbox": [
+        197.6,
+        193.7,
+        547.8,
+        469.7
+      ],
+      "iscrowd": 0,
+      "id": 0
+    },
+    ...
+  ```
 - Test JSON 파일은 Train JSON 파일과 동일한 구조를 가지며, 단 Annotation 정보만 빠져 있습니다.
 <br />
 
@@ -170,45 +170,52 @@ project
 ```
 ### 2. EDA
 #### 2-1. Streamlit
-- Train data 및 inference 결과의 EDA을 위해 Streamlit을 활용했습니다. Streamlit을 통해 EDA를 진행하기 위해 다음을 실행하세요.
-  ```bash
-  bash EDA_Streamlit.sh
-  ```
-  - 실행을 위해 다음의 인자가 필요합니다.
-      - **dataset_path** : dataset 경로
-      - **font_path** : bbox의 시각화를 위한 font 경로 (우리의 Repository에 있는 arial.ttf을 이용하세요)
-      - **inference_path** : inference json 파일 경로
-      - **validation_path** : validation json 파일 경로
-  - 데모 실행을 위해 validation_json, inference_json directory에 데모 json 파일이 있습니다.
+Train data 및 inference 결과의 EDA을 위해 Streamlit을 활용했습니다. Streamlit을 통해 EDA를 진행하기 위해 다음을 실행하세요.
+```bash
+bash EDA_Streamlit.sh
+```
+실행을 위해 다음의 인자가 필요합니다.
+
+  - **dataset_path** : dataset 경로
+  - **font_path** : bbox의 시각화를 위한 font 경로 (우리의 Repository에 있는 arial.ttf을 이용하세요)
+  - **inference_path** : inference json 파일 경로
+  - **validation_path** : validation json 파일 경로
+  
+데모 실행을 위해 validation_json, inference_json directory에 데모 json 파일이 있습니다.
+
 #### 2-2. confusion_matrix
-- Confusion matrix를 시각화하기 위해 confusion_matrix_trash.py 코드를 추가하였습니다.
-- 해당 코드는 validation inference 시 confusion matrix도 함께 출력하기 위한 코드로 직접 실행하지 않고 val.py에서 import해 사용합니다. mmdetectionv2_val.py에서 confusion matrix를 출력하는 코드를 확인하실 수 있습니다.
-- mmdetectionv2_val.py를 실행하면 추론 결과를 담은 json 파일, confusion_matrix를 위한 pickel파일, confusion_matrix png파일이 함께 저장됩니다.
+Confusion matrix를 시각화하기 위해 confusion_matrix_trash.py 코드를 추가하였습니다.
+
+해당 코드는 validation inference 시 confusion matrix도 함께 출력하기 위한 코드로 직접 실행하지 않고 val.py에서 import해 사용합니다. mmdetectionv2_val.py에서 confusion matrix를 출력하는 코드를 확인하실 수 있습니다.
+
+mmdetectionv2_val.py를 실행하면 추론 결과를 담은 json 파일, confusion_matrix를 위한 pickel파일, confusion_matrix png파일이 함께 저장됩니다.
         
 ### 3. Train and inference
-- 프로젝트를 위해 mmdetection V2 및 V3, Detectron2를 사용했습니다. 각 라이브러리에 해당하는 directory에 train과 inference를 위한 코드가 있습니다.
-- 해당 코드들을 사용하기 위해 mmdetection 및 Detectron2 라이브러리에 포함된 config 파일이 필요합니다. 밑의 링크들을 통해 config 파일과 그에 필요한 구성 요소들을 clone할 수 있습니다.
+프로젝트를 위해 mmdetection V2 및 V3, Detectron2를 사용했습니다. 각 라이브러리에 해당하는 directory에 train과 inference를 위한 코드가 있습니다.
+
+해당 코드들을 사용하기 위해 mmdetection 및 Detectron2 라이브러리에 포함된 config 파일이 필요합니다. 밑의 링크들을 통해 config 파일과 그에 필요한 구성 요소들을 clone할 수 있습니다.
   
-  - [mmdetection](https://github.com/open-mmlab/mmdetection) 
-  - [Detectron2](https://github.com/facebookresearch/detectron2)
-- [라이브러리명]_val.py 파일은 Streamlit 시각화를 위해 validation inference 결과에 대한 json 파일을 추출하는 코드입니다. Detectron2의 경우 detectron2_inference.py를 통해 json 파일을 추출할 수 있습니다. 
+- [mmdetection](https://github.com/open-mmlab/mmdetection) 
+- [Detectron2](https://github.com/facebookresearch/detectron2)
+
+[라이브러리명]_val.py 파일은 Streamlit 시각화를 위해 validation inference 결과에 대한 json 파일을 추출하는 코드입니다. Detectron2의 경우 detectron2_inference.py를 통해 json 파일을 추출할 수 있습니다. 
 <br />
 
 ### 4. ensemble
-- 앙상블을 사용하기 위해 다음을 실행하세요.
+앙상블을 사용하기 위해 다음을 실행하세요.
 ```bash
 python ./src/ensemble.py
 ```
 
 아래 변수 값을 수정하여 csv 파일 및 json 저장경로를 지정할 수 있습니다.
-```python3
+```python
 root = ['*.csv',] # 앙상블을 진행할 csv 파일을 지정합니다.
 submission_dir = '../../submission/' # csv 파일이 저장된 경로 및 앙상블 후 저장할 경로를 지정합니다.
 annotation = '../../dataset/test.json' # 앙상블에 사용하기 위해 file의 image 정보가 포함된 json 파일 경로를 지정합니다.
 ```
 
 아래 변수 값을 수정하여 앙상블 기법 및 수치를 지정할 수 있습니다.
-```python3
+```python
 ensemble_type = '' #[nms, wbf, nmw, soft-nms] 중 사용할 앙상블 기법을 선택합니다. 
 iou_thr = 0.5 #iou threshold 값을 설정합니다.
 
@@ -249,4 +256,4 @@ weights = [1] * len(submission_df) # 각 모델의 동일한 가중치 1을 고�
 </div>
 
 ## ⚡️ Detail   
-- 프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level2-objectdetection-cv-23/blob/main/docs/CV_23_WrapUp_Report_detection.pdf) 에서 확인할 수 있습니다.
+프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level2-objectdetection-cv-23/blob/main/docs/CV_23_WrapUp_Report_detection.pdf) 에서 확인할 수 있습니다.
